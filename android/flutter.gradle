@@ -1,0 +1,13 @@
+// Legacy Flutter Gradle apply script for Kotlin DSL projects.
+// Works around dev.flutter.flutter-gradle-plugin afterEvaluate crash.
+def flutterRoot = new Properties()
+def localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader("UTF-8") { reader -> flutterRoot.load(reader) }
+}
+def flutterSdkPath = flutterRoot.getProperty("flutter.sdk")
+if (flutterSdkPath == null) {
+    throw new GradleException("flutter.sdk not set in local.properties")
+}
+
+apply from: "$flutterSdkPath/packages/flutter_tools/gradle/flutter.gradle"

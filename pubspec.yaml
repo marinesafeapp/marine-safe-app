@@ -1,0 +1,74 @@
+name: flutter_application_1
+description: "Marine Safe App"
+publish_to: 'none'
+
+version: 1.0.1+4
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Keep app alive during active trip so overdue alerts fire when app is closed
+  flutter_background_service: ^5.1.0
+
+  # Firebase
+  firebase_core: ^4.4.0
+  firebase_crashlytics: ^5.0.7
+  firebase_analytics: ^12.1.0
+  cloud_firestore: ^6.0.0
+  firebase_auth: ^6.0.0
+
+  cupertino_icons: ^1.0.8
+  provider: ^6.1.2
+
+  # Storage & Devices
+  shared_preferences: ^2.3.2
+  geolocator: ^14.0.2
+  sqflite: ^2.3.3+2
+  path: ^1.9.0
+
+  # Media & Links
+  url_launcher: ^6.3.2
+  image_picker: ^1.1.2
+
+  # Maps
+  flutter_map: ^8.1.1
+  latlong2: ^0.9.1
+  flutter_map_location_marker: ^10.1.0
+
+  # Networking
+  http: ^1.2.1
+
+  # Notifications
+  flutter_local_notifications: ^17.2.1
+  timezone: ^0.9.4
+
+  # Alert reliability check (permissions, battery, exact alarms)
+  permission_handler: ^11.3.1
+  device_info_plus: ^11.1.0
+  android_intent_plus: ^5.3.0
+
+  # Formatting (used by safety_equipment_screen etc.)
+  intl: ^0.19.0
+
+  # QR code for invite crew
+  qr_flutter: ^4.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Only bundle assets actually used (reduces app size)
+  assets:
+    - assets/branding/marine_safe_logo_full.png.jpg
+    - assets/branding/marine_safe_logo_icon.png
+    - assets/branding/marine_safe_app_icons/marine_safe_logo_full1.png
+    - assets/images/boat.png
+  # Add when you add the file: assets/branding/marine_safe_logo_full.png

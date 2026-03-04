@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Trips: authenticated users can read all trips (for Moderator screen)
+    // Write: any authenticated user (users can write their own, Moderator can seed demo data)
+    // Note: In production, consider using Firebase Auth custom claims to restrict Moderator writes
+    match /trips/{tripId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+
+      // GPS points subcollection: only trip owner can write, authenticated users can read
+      match /gpsPoints/{pointId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && request.auth.uid == tripId;
+        allow update: if request.auth != null && request.auth.uid == tripId;
+        allow delete: if request.auth != null && request.auth.uid == tripId;
+      }
+    }
+
+    // Users: authenticated users can read/write (for Moderator screen to seed demo data)
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+
+    // Join codes: crew can read by code; only trip owner can create/update/delete (doc stores uid = owner)
+    match /tripCodes/{code} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+
+      allow update, delete: if request.auth != null
+        && resource.data.uid == request.auth.uid;
+    }
+  }
+}
