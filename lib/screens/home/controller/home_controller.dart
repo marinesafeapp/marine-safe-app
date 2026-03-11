@@ -15,6 +15,7 @@ import '../services/people_on_board_service.dart';
 import '../services/favourite_ramps_service.dart';
 import '../services/home_notifications_service.dart';
 import '../services/exact_alarm_permission_service.dart';
+import '../services/emergency_sms_service.dart';
 
 import '../../../services/fix_issue_router.dart';
 import '../../../services/reliability/reliability_check_service.dart';
@@ -341,6 +342,8 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
     await _overdueFlow.show(
       context: context,
       onAcknowledge: () => acknowledgeOverdue(context),
+      onOpenSmsToEmergencyContact: (ctx) =>
+          EmergencySmsService.openEmergencySmsForOverdue(ctx),
     );
   }
 
@@ -619,6 +622,21 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
       await TripPrefs.setRampId(state.selectedRamp!.id);
       await TripPrefs.setRampName(state.selectedRamp!.name);
     }
+    // Persist vessel name for escalation SMS (Pro: selected vessel; else default).
+    String? vesselName;
+    try {
+      final vesselId = await VesselsService.instance.getSelectedVesselId();
+      if (vesselId != null && vesselId.isNotEmpty) {
+        final vessels = await VesselsService.instance.getVessels();
+        for (final v in vessels) {
+          if (v.id == vesselId && v.name.trim().isNotEmpty) {
+            vesselName = v.name.trim();
+            break;
+          }
+        }
+      }
+    } catch (_) {}
+    await TripPrefs.setVesselName(vesselName ?? 'My Boat');
     if (state.eta != null) {
       await TripPrefs.setEtaIso(state.eta!.toIso8601String());
     }
@@ -641,25 +659,57 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
 
   Future<void> endTrip() async {
     try {
-      await TripEscalationService.instance.cancelForTrip();
-      await _notifs.cancelAll();
       try {
-        await stopTripService();
+        await TripEscalationService.instance.cancelForTrip();
+        await _notifs.cancelAll();
+        try {
+          await stopTripService();
+        } catch (_) {}
+      } catch (_) {
+        // No-op on web / unsupported platforms; still clear trip below
+      }
+
+      await TripPrefs.setTripActive(false);
+      await TripPrefs.setEtaIso(null);
+      await TripPrefs.setRampName(null);
+      await TripPrefs.setVesselName(null);
+      await TripPrefs.setOverdueAck(false);
+      await TripPrefs.setOverdueNotifSent(false);
+
+      await state.endTripAndClearTripOnly();
+
+      // Defer notify to next frame and catch setState-after-dispose (e.g. user left screen during async endTrip)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        try {
+          notifyListeners();
+        } catch (e, st) {
+          debugPrint('endTrip: notifyListeners skipped (widget may be disposed): $e');
+        }
+      });
+
+      await _safeCloudMarkEnded();
+    } catch (e, st) {
+      debugPrint('endTrip error: $e\n$st');
+      // Still clear local state so user is not stuck with a trip that won't end
+      try {
+        await TripPrefs.setTripActive(false);
+        await TripPrefs.setEtaIso(null);
+        await TripPrefs.setRampName(null);
+        await TripPrefs.setVesselName(null);
+        await TripPrefs.setOverdueAck(false);
+        await TripPrefs.setOverdueNotifSent(false);
+        state.tripActive = false;
+        state.departAt = null;
+        state.eta = null;
+        state.overdueAcknowledged = false;
+        state.overdueAlertFiredThisTrip = false;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          try {
+            notifyListeners();
+          } catch (_) {}
+        });
       } catch (_) {}
-    } catch (_) {
-      // No-op on web / unsupported platforms; still clear trip below
     }
-
-    await TripPrefs.setTripActive(false);
-    await TripPrefs.setEtaIso(null);
-    await TripPrefs.setRampName(null);
-    await TripPrefs.setOverdueAck(false);
-    await TripPrefs.setOverdueNotifSent(false);
-
-    await state.endTripAndClearTripOnly();
-    notifyListeners();
-
-    await _safeCloudMarkEnded();
   }
 
   // ---------------------------
@@ -689,12 +739,18 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
     // ignore: avoid_print
     print('SYNC: active=${state.tripActive} eta=${state.eta} ack=${state.overdueAcknowledged}');
 
-    // OS-level escalation: DUE at ETA, OVERDUE at ETA+5, ESCALATING at ETA+10 then every 10 min (24×). Survives app kill/reboot.
+    // OS-level escalation: DUE at ETA, OVERDUE at ETA+5, SMS at +10/+20, Marine Rescue +30, Critical +60.
     final tripId = FirebaseAuth.instance.currentUser?.uid ?? 'current';
     if (!state.overdueAcknowledged) {
+      final rampName = state.selectedRamp?.name ?? (await TripPrefs.getRampName()) ?? 'your ramp';
+      final vesselName = await TripPrefs.getVesselName();
+      final primaryContactName = await EmergencySmsService.getPrimaryContactName();
       await TripEscalationService.instance.scheduleForTrip(
         eta: state.eta!,
         tripId: tripId,
+        rampName: rampName,
+        vesselName: vesselName,
+        primaryContactName: primaryContactName,
       );
     } else {
       await TripEscalationService.instance.cancelForTrip();
@@ -756,6 +812,9 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
           Navigator.pop(context);
           acknowledgeOverdue(context);
         }
+            : null,
+        onTextEmergencyContact: showAck
+            ? () => EmergencySmsService.openEmergencySmsForOverdue(context)
             : null,
         onEndTrip: () async {
           Navigator.pop(context);

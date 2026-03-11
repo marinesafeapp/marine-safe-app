@@ -13,41 +13,57 @@ const String _kEscalationEnabled = 'escalation_enabled';
 
 Future<SharedPreferences> _prefs() => SharedPreferences.getInstance();
 
-/// Trip escalation: DUE at ETA, OVERDUE at ETA+5, ESCALATING at ETA+10 then every 10 min.
-/// Uses OS-level scheduled local notifications only. No Dart timers for critical events.
+/// Marine Safe Escalation Plan:
+/// 1. ETA (0–5 min grace): Due notification to skipper
+/// 2. ETA+5 min: Overdue alert to skipper
+/// 3. ETA+10 min: SMS to primary contact (notification: tap to open SMS)
+/// 4. ETA+20 min: SMS to all contacts (notification: tap to open SMS)
+/// 5. ETA+30 min: Recommend contact Marine Rescue
+/// 6. ETA+60 min: Critical overdue
 class TripEscalationService {
   TripEscalationService._();
   static final TripEscalationService instance = TripEscalationService._();
 
-  /// DUE at ETA
   static const int idDue = 9101;
-  /// OVERDUE at ETA+5 min
   static const int idOverdue = 9102;
-  /// ESCALATING: 9200..9223 (24 slots), first at ETA+10 min, then every 10 min
-  static const int escalationBaseId = 9200;
-  static const int escalationCount = 24;
+  static const int idSmsPrimary = 9103;
+  static const int idSmsAll = 9104;
+  static const int idMarineRescue = 9105;
+  static const int idCritical = 9106;
+
+  /// Payloads for notification tap handling (open SMS when user taps ETA+10 / ETA+20 notification).
+  static const String payloadSmsPrimary = 'escalation_sms_primary';
+  static const String payloadSmsAll = 'escalation_sms_all';
+
+  static const String _payloadSmsPrimary = payloadSmsPrimary;
+  static const String _payloadSmsAll = payloadSmsAll;
 
   static const String _titleDue = 'Marine Safe — Due now';
   static const String _bodyDue = 'ETA reached. Tap to open Marine Safe.';
   static const String _titleOverdue = 'Marine Safe — Overdue';
   static const String _bodyOverdue = 'No check-in received. Tap to open Marine Safe.';
-  static const String _titleEscalating = 'Marine Safe — Overdue (Escalating)';
-  static const String _bodyEscalating = 'Still no response. Tap to open Marine Safe.';
+  static const String _titleSmsPrimary = 'Marine Safe — Contact your emergency contact';
+  static const String _titleSmsAll = 'Marine Safe — Alert all contacts';
+  static const String _titleMarineRescue = 'Marine Safe — Consider Marine Rescue';
+  static const String _bodyMarineRescue =
+      'Trip is 30 min overdue. Consider contacting Marine Rescue or 000 if you have concerns.';
+  static const String _titleCritical = 'Marine Safe — CRITICAL OVERDUE';
+  static const String _bodyCritical =
+      'Trip is 1 hour overdue. Open Marine Safe to acknowledge or contact emergency services.';
+
+  static List<int> get _allIds =>
+      [idDue, idOverdue, idSmsPrimary, idSmsAll, idMarineRescue, idCritical];
 
   final NotificationScheduler _scheduler = NotificationScheduler.instance;
 
-  /// All notification IDs used by this service (for cancelAll).
-  static List<int> get _allIds {
-    final list = <int>[idDue, idOverdue];
-    for (int i = 0; i < escalationCount; i++) {
-      list.add(escalationBaseId + i);
-    }
-    return list;
-  }
-
-  /// Schedule DUE at ETA, OVERDUE at ETA+5, ESCALATING at ETA+10 then every 10 min (24 repeats).
-  /// Cancels any existing schedules first. Persists state.
-  Future<void> scheduleForTrip({required DateTime eta, required String tripId}) async {
+  /// Schedule full escalation: DUE at ETA, OVERDUE at ETA+5, SMS prompts at +10/+20, Marine Rescue at +30, Critical at +60.
+  Future<void> scheduleForTrip({
+    required DateTime eta,
+    required String tripId,
+    String rampName = 'your ramp',
+    String? vesselName,
+    String? primaryContactName,
+  }) async {
     if (kIsWeb) return;
     await cancelForTrip();
 
@@ -63,13 +79,35 @@ class TripEscalationService {
       body: _bodyOverdue,
       when: eta.add(const Duration(minutes: 5)),
     );
-    await _scheduler.scheduleRepeatingWindows(
-      baseId: escalationBaseId,
-      firstWhen: eta.add(const Duration(minutes: 10)),
-      intervalMinutes: 10,
-      count: escalationCount,
-      title: _titleEscalating,
-      body: _bodyEscalating,
+
+    final contactLabel = (primaryContactName != null && primaryContactName.trim().isNotEmpty)
+        ? primaryContactName.trim()
+        : 'your emergency contact';
+    await _scheduler.scheduleAt(
+      id: idSmsPrimary,
+      title: _titleSmsPrimary,
+      body: 'Send overdue alert to $contactLabel — tap to open SMS.',
+      when: eta.add(const Duration(minutes: 10)),
+      payload: _payloadSmsPrimary,
+    );
+    await _scheduler.scheduleAt(
+      id: idSmsAll,
+      title: _titleSmsAll,
+      body: 'Send overdue alert to all contacts — tap to open SMS.',
+      when: eta.add(const Duration(minutes: 20)),
+      payload: _payloadSmsAll,
+    );
+    await _scheduler.scheduleAt(
+      id: idMarineRescue,
+      title: _titleMarineRescue,
+      body: _bodyMarineRescue,
+      when: eta.add(const Duration(minutes: 30)),
+    );
+    await _scheduler.scheduleAt(
+      id: idCritical,
+      title: _titleCritical,
+      body: _bodyCritical,
+      when: eta.add(const Duration(minutes: 60)),
     );
 
     final p = await _prefs();
@@ -102,9 +140,21 @@ class TripEscalationService {
   }
 
   /// Call when ETA is extended/changed. Reschedules all notifications with new ETA.
-  Future<void> onEtaChanged(DateTime newEta, String tripId) async {
+  Future<void> onEtaChanged(
+    DateTime newEta,
+    String tripId, {
+    String rampName = 'your ramp',
+    String? vesselName,
+    String? primaryContactName,
+  }) async {
     if (kIsWeb) return;
-    await scheduleForTrip(eta: newEta, tripId: tripId);
+    await scheduleForTrip(
+      eta: newEta,
+      tripId: tripId,
+      rampName: rampName,
+      vesselName: vesselName,
+      primaryContactName: primaryContactName,
+    );
   }
 
   /// Whether escalation is currently enabled (trip active, not acked, not ended).

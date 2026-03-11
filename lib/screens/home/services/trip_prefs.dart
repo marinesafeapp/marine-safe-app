@@ -6,6 +6,9 @@ class TripPrefs {
   static const _kRampId = 'trip.rampId';
   static const _kRampName = 'trip.rampName';
 
+  /// Vessel/boat name for escalation SMS (saved when trip starts).
+  static const _kVesselName = 'trip.vesselName';
+
   static const _kPersonsOnBoard = 'trip.personsOnBoard';
   static const _kLastPersonsOnBoard = 'trip.lastPersonsOnBoard';
 
@@ -59,6 +62,18 @@ class TripPrefs {
 
   static Future<String?> getRampName() async =>
       (await _p()).getString(_kRampName);
+
+  static Future<void> setVesselName(String? name) async {
+    final p = await _p();
+    if (name == null || name.trim().isEmpty) {
+      await p.remove(_kVesselName);
+    } else {
+      await p.setString(_kVesselName, name.trim());
+    }
+  }
+
+  static Future<String?> getVesselName() async =>
+      (await _p()).getString(_kVesselName);
 
   // ---- People on board ----
   static Future<void> setPersonsOnBoard(int v) async =>

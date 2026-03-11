@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../screens/home/services/trip_prefs.dart';
@@ -157,9 +157,16 @@ Future<void> startTripService() async {
 /// Call from UI when user ends the trip.
 Future<void> stopTripService() async {
   if (kIsWeb) return;
-  // Stop GPS tracking when trip ends
-  await GPSTrackingService.instance.stopTracking();
-  await GPSTrackingService.instance.clearAllPoints();
-  final service = FlutterBackgroundService();
-  service.invoke('stop');
+  try {
+    await GPSTrackingService.instance.stopTracking();
+    await GPSTrackingService.instance.clearAllPoints();
+  } catch (e) {
+    debugPrint('stopTripService: GPS stop/clear failed: $e');
+  }
+  try {
+    final service = FlutterBackgroundService();
+    service.invoke('stop');
+  } catch (e) {
+    debugPrint('stopTripService: invoke stop failed: $e');
+  }
 }

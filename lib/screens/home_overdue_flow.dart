@@ -6,6 +6,7 @@ class HomeOverdueFlow {
   Future<void> show({
     required BuildContext context,
     required Future<void> Function() onAcknowledge,
+    Future<void> Function(BuildContext context)? onOpenSmsToEmergencyContact,
   }) async {
     if (_dialogShowing) return;
     _dialogShowing = true;
@@ -13,7 +14,7 @@ class HomeOverdueFlow {
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text(
           "OVERDUE",
           style: TextStyle(fontWeight: FontWeight.w900),
@@ -21,12 +22,19 @@ class HomeOverdueFlow {
         content: const Text(
           "Your return ETA has passed.\n\n"
               "If you are safe, acknowledge this alert.\n\n"
-              "If you are in danger, call 000 or use VHF Channel 16 immediately.",
+              "If you need help, text your emergency contact or call 000 / VHF Channel 16 immediately.",
         ),
         actions: [
+          if (onOpenSmsToEmergencyContact != null)
+            TextButton(
+              onPressed: () async {
+                await onOpenSmsToEmergencyContact(ctx);
+              },
+              child: const Text("TEXT EMERGENCY CONTACT"),
+            ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(ctx);
               await onAcknowledge();
             },
             child: const Text("ACKNOWLEDGE"),

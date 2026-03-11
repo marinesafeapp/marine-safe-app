@@ -2,6 +2,19 @@
 
 Marine Safe is a Flutter app focused on marine safety workflows (ramps, trips, and overdue alerts), with Firebase integration and Android notification reliability hardening.
 
+## What Marine Safe does
+
+- **Trip safety** — Set launch ramp and return ETA; start/end trip; GPS tracking during trip; trip state synced to cloud.
+- **Overdue escalation** — If you don’t check in: Due at ETA → Overdue at ETA+5 min → “Tap to open SMS” to emergency contact at ETA+10 and ETA+20 → Marine Rescue suggestion at ETA+30 → Critical overdue at ETA+60. SMS includes vessel, ramp, ETA, last location, map link (user taps Send).
+- **Profile & contacts** — Name, email, phone, postcode; Emergency contacts 1 & 2; used for escalation SMS and “Text emergency contact” when overdue.
+- **Boat & safety** — Boat/vessel details; safety equipment checklist; compliance check before starting a trip.
+- **Info** — Weather (Forecast tab), Tides, Can we fish here?, Fishing rules (quick actions on Trip tab).
+- **Pro / crew** — Multiple vessels; Invite crew (join code + QR); Join boat to view someone else’s trip.
+- **Moderator** — View active/ended trips and user details; End trip for a user.
+- **Reliability** — Android foreground service so alerts fire when app is closed; battery optimisation prompt; exact alarms permission.
+
+Full feature list: **`docs/FEATURES_OVERVIEW.md`** (one-pager for evaluators, App Store, or stakeholders).
+
 ## Quick start (developers)
 
 - **Install deps**:

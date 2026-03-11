@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ✅ Alias imports so HomeTripState can NEVER collide
 import 'package:flutter_application_1/screens/home/controller/home_controller.dart' as hc;
@@ -8,11 +9,14 @@ import 'package:flutter_application_1/screens/can_we_fish_here_screen.dart';
 import 'package:flutter_application_1/screens/fishing_rules_screen.dart';
 import 'package:flutter_application_1/screens/tides_screen.dart';
 import 'package:flutter_application_1/screens/home/services/exact_alarm_permission_service.dart';
+import 'package:flutter_application_1/screens/home/services/emergency_sms_service.dart';
 import 'package:flutter_application_1/screens/home/widgets/ramp_card.dart';
 import 'package:flutter_application_1/screens/home/widgets/eta_card.dart';
 import 'package:flutter_application_1/screens/home/widgets/start_end_trip_button.dart';
 import 'package:flutter_application_1/screens/home/widgets/trip_active_widgets.dart';
 import 'package:flutter_application_1/screens/home/services/battery_optimisation_service.dart';
+import 'package:flutter_application_1/services/notifications/notification_bootstrap.dart';
+import 'package:flutter_application_1/services/trip/trip_escalation_service.dart';
 
 /// Trip tab index in MainShell bottom nav.
 const int _kTripTabIndex = 2;
@@ -59,8 +63,24 @@ class _HomeScreenState extends State<HomeScreen> {
       await BatteryOptimisationService.showIfNeeded(context);
 
       if (!mounted) return;
+      await _handlePendingEscalationAction(context);
+
+      if (!mounted) return;
       setState(() {});
     });
+  }
+
+  /// If user tapped ETA+10 or ETA+20 notification, open SMS to primary contact.
+  Future<void> _handlePendingEscalationAction(BuildContext context) async {
+    final p = await SharedPreferences.getInstance();
+    final action = p.getString(kPendingEscalationActionKey);
+    if (action == null || action.isEmpty) return;
+    await p.remove(kPendingEscalationActionKey);
+    if (!context.mounted) return;
+    if (action == TripEscalationService.payloadSmsPrimary ||
+        action == TripEscalationService.payloadSmsAll) {
+      await EmergencySmsService.openEscalationSmsToPrimaryContact(context);
+    }
   }
 
   @override
@@ -69,6 +89,8 @@ class _HomeScreenState extends State<HomeScreen> {
     // When user switches to Trip tab, refresh ramp list (closest ramps within 200 km of postcode)
     if (oldWidget.currentTabIndex != _kTripTabIndex && widget.currentTabIndex == _kTripTabIndex) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await _handlePendingEscalationAction(context);
         if (!mounted) return;
         // Short delay so Profile's postcode save has time to commit to prefs
         await Future.delayed(const Duration(milliseconds: 200));

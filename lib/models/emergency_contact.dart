@@ -14,8 +14,8 @@ class EmergencyContact {
 
   factory EmergencyContact.fromJson(Map<String, dynamic> json) {
     return EmergencyContact(
-      name: json["name"],
-      phone: json["phone"],
+      name: (json["name"] as String?) ?? '',
+      phone: (json["phone"] as String?) ?? '',
     );
   }
 }

@@ -14,6 +14,9 @@ class TripManageSheet extends StatelessWidget {
   final bool showAcknowledge;
   final VoidCallback? onAcknowledgeOverdue;
 
+  /// When overdue, optional: open SMS to emergency contact with prefilled alert.
+  final Future<void> Function()? onTextEmergencyContact;
+
   final Future<void> Function() onEndTrip;
 
   /// When personsOnBoard > 1, call to get join code and show invite UI.
@@ -29,6 +32,7 @@ class TripManageSheet extends StatelessWidget {
     required this.onExtend1h,
     required this.showAcknowledge,
     required this.onAcknowledgeOverdue,
+    this.onTextEmergencyContact,
     required this.onEndTrip,
     this.onInviteCrew,
   });
@@ -141,6 +145,16 @@ class TripManageSheet extends StatelessWidget {
                     onPressed: onAcknowledgeOverdue,
                     child: const Text('Acknowledge Overdue'),
                   ),
+                  if (onTextEmergencyContact != null) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        await onTextEmergencyContact!();
+                      },
+                      icon: const Icon(Icons.sms_rounded, size: 20),
+                      label: const Text('Text emergency contact'),
+                    ),
+                  ],
                 ],
 
                 if (personsOnBoard > 1 && onInviteCrew != null) ...[
