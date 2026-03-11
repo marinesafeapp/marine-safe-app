@@ -1,0 +1,8 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Add your security rules here. Example:
+    // match /trips/{tripId} { allow read, write: if request.auth != null && request.auth.uid == tripId; }
+    match /{document=**} { allow read, write: if request.auth != null; }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "Marinesafeapp": "marine-safe-app",
+    "default": "marine-safe-app"
+  },
+  "targets": {},
+  "etags": {}
+}
