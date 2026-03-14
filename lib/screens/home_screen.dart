@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:marine_safe_app_fixed/screens/home/controller/home_controller.dart' as hc;
 import 'package:marine_safe_app_fixed/screens/home/models/home_trip_state.dart' as hts;
 
+import 'package:marine_safe_app_fixed/models/vessel.dart';
+import 'package:marine_safe_app_fixed/services/user_profile_service.dart';
+import 'package:marine_safe_app_fixed/services/vessels_service.dart';
+
 import 'package:marine_safe_app_fixed/screens/can_we_fish_here_screen.dart';
 import 'package:marine_safe_app_fixed/screens/fishing_rules_screen.dart';
 import 'package:marine_safe_app_fixed/screens/tides_screen.dart';
@@ -13,6 +17,7 @@ import 'package:marine_safe_app_fixed/screens/home/widgets/eta_card.dart';
 import 'package:marine_safe_app_fixed/screens/home/widgets/start_end_trip_button.dart';
 import 'package:marine_safe_app_fixed/screens/home/widgets/trip_active_widgets.dart';
 import 'package:marine_safe_app_fixed/screens/home/services/battery_optimisation_service.dart';
+import 'package:marine_safe_app_fixed/screens/trip_status.dart';
 
 /// Trip tab index in MainShell bottom nav.
 const int _kTripTabIndex = 2;
@@ -33,6 +38,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final Color _accent = const Color(0xFF2CB6FF);
 
   bool _overdueDialogQueued = false;
+  bool _isPro = false;
+  List<Vessel> _vessels = [];
+  String? _selectedVesselId;
 
   static const Color _bg = Color(0xFF02050A);
   static const Color _bgBottom = Color(0xFF050d18);
@@ -46,6 +54,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
 
       await controller.init(context);
+      if (!mounted) return;
+      await _loadVesselState();
       if (!mounted) return;
       // Refresh ramp list so postcode filter is applied
       await controller.refreshRampsForSelection();
@@ -70,12 +80,85 @@ class _HomeScreenState extends State<HomeScreen> {
     if (oldWidget.currentTabIndex != _kTripTabIndex && widget.currentTabIndex == _kTripTabIndex) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
-        // Short delay so Profile's postcode save has time to commit to prefs
         await Future.delayed(const Duration(milliseconds: 200));
         if (!mounted) return;
+        await _loadVesselState();
         await controller.refreshRampsForSelection();
       });
     }
+  }
+
+  Future<void> _loadVesselState() async {
+    final isPro = await UserProfileService.instance.getIsPro();
+    if (!isPro) {
+      if (mounted) setState(() {
+        _isPro = false;
+        _vessels = [];
+        _selectedVesselId = null;
+      });
+      return;
+    }
+    final vessels = await VesselsService.instance.getVessels();
+    final selectedId = await VesselsService.instance.getSelectedVesselId();
+    if (mounted) setState(() {
+      _isPro = true;
+      _vessels = vessels;
+      _selectedVesselId = selectedId;
+    });
+  }
+
+  void _showVesselPicker(BuildContext context) {
+    if (_vessels.isEmpty) return;
+    final selectedId = _selectedVesselId;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: _bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          border: Border.all(color: Colors.white12),
+        ),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(ctx).padding.bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              "Vessel for this trip",
+              style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            ..._vessels.map((v) {
+              final isSelected = v.id == selectedId;
+              return ListTile(
+                leading: Icon(
+                  v.type == 'jet_ski' ? Icons.two_wheeler_rounded : Icons.directions_boat_rounded,
+                  color: isSelected ? _accent : Colors.white54,
+                  size: 24,
+                ),
+                title: Text(
+                  v.name.isEmpty ? 'Unnamed' : v.name,
+                  style: TextStyle(
+                    color: isSelected ? _accent : Colors.white,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                  ),
+                ),
+                subtitle: v.boatRego.isNotEmpty
+                    ? Text('Rego: ${v.boatRego}', style: TextStyle(color: Colors.white54, fontSize: 12))
+                    : null,
+                selected: isSelected,
+                onTap: () async {
+                  await VesselsService.instance.setSelectedVesselId(v.id);
+                  if (mounted) setState(() => _selectedVesselId = v.id);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+              );
+            }),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -165,6 +248,134 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _onTheWaterMinimisedStrip(
+    BuildContext context, {
+    required TripStatus status,
+    required DateTime eta,
+    required String rampName,
+    required VoidCallback onTap,
+  }) {
+    final now = DateTime.now();
+    final c = tripStatusColor(status);
+    final String statusLabel = status == TripStatus.overdue
+        ? "OVERDUE ${formatDurationShort(now.difference(eta))}"
+        : status == TripStatus.dueSoon
+            ? "DUE SOON · ${formatDurationShort(eta.difference(now))}"
+            : "On the water · ${formatDurationShort(eta.difference(now))}";
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: status == TripStatus.overdue ? Colors.redAccent.withValues(alpha: 0.5) : Colors.white12,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                status == TripStatus.overdue ? Icons.warning_rounded : Icons.waves_rounded,
+                color: c,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      statusLabel,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      rampName,
+                      style: TextStyle(color: Colors.white60, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: Colors.white54, size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _vesselStrip() {
+    Vessel? selected;
+    if (_selectedVesselId != null) {
+      for (final v in _vessels) {
+        if (v.id == _selectedVesselId) {
+          selected = v;
+          break;
+        }
+      }
+    }
+    final name = selected != null
+        ? (selected!.name.isEmpty ? 'Unnamed' : selected!.name)
+        : 'Select vessel';
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showVesselPicker(context),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+          decoration: BoxDecoration(
+            color: _accent.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _accent.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.directions_boat_rounded, color: _accent, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "Vessel",
+                      style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: Colors.white54, size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _compactCard({
     required IconData icon,
     required String title,
@@ -240,6 +451,42 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _minimalRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required VoidCallback onChange,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onChange,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.white54, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  value,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                "Change",
+                style: TextStyle(color: _accent, fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -291,19 +538,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _statusStrip(s.tripActive && s.eta != null),
-                          // TRIP ACTIVE MODE
                           if (s.tripActive && s.eta != null) ...[
-                            ActiveTripBanner(
-                              accent: _accent,
-                              rampName: s.selectedRamp?.name ?? "Selected ramp",
-                              departAt: s.departAt,
-                              eta: s.eta!,
-                              status: s.tripStatus,
-                            ),
+                            _statusStrip(true),
                             const SizedBox(height: 12),
-                            TripActiveManageCard(
+                          ],
+                          if (_isPro && _vessels.length > 1 && _selectedVesselId == null) ...[
+                            _vesselStrip(),
+                            const SizedBox(height: 12),
+                          ],
+                          // TRIP ACTIVE MODE — minimised "On the water" strip
+                          if (s.tripActive && s.eta != null) ...[
+                            _onTheWaterMinimisedStrip(
+                              context,
                               status: s.tripStatus,
+                              eta: s.eta!,
+                              rampName: s.selectedRamp?.name ?? "Selected ramp",
                               onTap: () => controller.openManageTripSheet(context),
                             ),
                             const SizedBox(height: 12),
@@ -381,30 +630,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                 rampListSubtitle: controller.rampListSubtitle,
                               ),
                             ] else ...[
-                              _compactCard(
+                              _minimalRow(
                                 icon: Icons.anchor_rounded,
-                                title: "Launch ramp",
+                                label: "Ramp",
                                 value: s.selectedRamp!.name,
-                                trailing: IconButton(
-                                  tooltip: controller.isFavouriteRamp(s.selectedRamp!.id)
-                                      ? "Unfavourite"
-                                      : "Favourite",
-                                  onPressed: () async {
-                                    await controller.toggleFavouriteRamp(s.selectedRamp!);
-                                  },
-                                  icon: Icon(
-                                    controller.isFavouriteRamp(s.selectedRamp!.id)
-                                        ? Icons.star_rounded
-                                        : Icons.star_border_rounded,
-                                    color: controller.isFavouriteRamp(s.selectedRamp!.id)
-                                        ? Colors.amber
-                                        : Colors.white70,
-                                  ),
-                                ),
-                                onChange: () async => controller.clearRamp(),
+                                onChange: () => controller.clearRamp(),
                               ),
                             ],
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 10),
                             if (s.eta == null) ...[
                               EtaCard(
                                 accent: _accent,
@@ -417,11 +650,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                 onExtend1h: null,
                               ),
                             ] else ...[
-                              _compactCard(
+                              _minimalRow(
                                 icon: Icons.schedule_rounded,
-                                title: "Return ETA",
+                                label: "Return ETA",
                                 value: _formatTime(context, s.eta!),
-                                onChange: () async => controller.clearEta(),
+                                onChange: () => controller.clearEta(),
                               ),
                             ],
                             const SizedBox(height: 14),

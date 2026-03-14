@@ -5,12 +5,14 @@ class TripPrefs {
   static const _kEtaIso = 'trip.etaIso';
   static const _kRampId = 'trip.rampId';
   static const _kRampName = 'trip.rampName';
+  static const _kDepartAtIso = 'trip.departAtIso';
 
   static const _kPersonsOnBoard = 'trip.personsOnBoard';
   static const _kLastPersonsOnBoard = 'trip.lastPersonsOnBoard';
 
   static const _kOverdueAck = 'trip.overdueAck';
   static const _kOverdueNotifSent = 'trip.overdueNotifSent';
+  static const _kOverdueRecorded = 'trip.overdueRecorded';
 
   /// Set once after user has seen Alert Reliability (registration or first trip). Never show again per trip.
   static const _kAlertReliabilityAcknowledged = 'app.alert_reliability_acknowledged';
@@ -60,6 +62,18 @@ class TripPrefs {
   static Future<String?> getRampName() async =>
       (await _p()).getString(_kRampName);
 
+  static Future<void> setDepartAtIso(String? iso) async {
+    final p = await _p();
+    if (iso == null) {
+      await p.remove(_kDepartAtIso);
+    } else {
+      await p.setString(_kDepartAtIso, iso);
+    }
+  }
+
+  static Future<String?> getDepartAtIso() async =>
+      (await _p()).getString(_kDepartAtIso);
+
   // ---- People on board ----
   static Future<void> setPersonsOnBoard(int v) async =>
       (await _p()).setInt(_kPersonsOnBoard, v);
@@ -87,6 +101,14 @@ class TripPrefs {
 
   static Future<bool> getOverdueNotifSent() async =>
       (await _p()).getBool(_kOverdueNotifSent) ?? false;
+
+  /// True once the overdue stage has been recorded/handled for the current active trip.
+  /// Used to dedupe in-app overdue UI and any legacy emitters across app restarts.
+  static Future<void> setOverdueRecorded(bool v) async =>
+      (await _p()).setBool(_kOverdueRecorded, v);
+
+  static Future<bool> getOverdueRecorded() async =>
+      (await _p()).getBool(_kOverdueRecorded) ?? false;
 
   // ---- Alert reliability (shown once after registration / first trip) ----
   static Future<void> setAlertReliabilityAcknowledged(bool v) async =>

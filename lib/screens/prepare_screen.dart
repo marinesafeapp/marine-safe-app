@@ -5,17 +5,36 @@ import 'join_boat_screen.dart';
 import 'pro_screen.dart';
 import 'safety_equipment_screen.dart';
 import 'trip_history_screen.dart';
+import '../services/user_profile_service.dart';
 
-/// "Gear" tab: links to boat details, safety equipment, trip history.
-class PrepareScreen extends StatelessWidget {
+/// "Gear" tab: links to boat details, safety equipment, trip history (Pro), Pro, join a boat.
+class PrepareScreen extends StatefulWidget {
   const PrepareScreen({super.key});
 
+  @override
+  State<PrepareScreen> createState() => _PrepareScreenState();
+}
+
+class _PrepareScreenState extends State<PrepareScreen> {
   static const Color _bg = Color(0xFF02050A);
   static const Color _accent = Color(0xFF2CB6FF);
   /// Darker card background to separate Gear from main app background
   static const Color _cardBg = Color(0xFF030508);
-  /// Background for Pro / Join a boat cards (slightly blue-tinted to distinguish)
-  static const Color _cardBgVariant = Color(0xFF06101A);
+  /// Slightly tinted card for upgrade-related items (free users only)
+  static const Color _cardBgVariant = Color(0xFF050A10);
+
+  bool _isPro = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPro();
+  }
+
+  Future<void> _loadPro() async {
+    final isPro = await UserProfileService.instance.getIsPro();
+    if (mounted) setState(() => _isPro = isPro);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,11 +55,13 @@ class PrepareScreen extends StatelessWidget {
       body: ListView(
         padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + bottomPad),
         children: [
-          const Padding(
-            padding: EdgeInsets.only(bottom: 16),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
             child: Text(
-              "Boat details, safety equipment, and trip history.",
-              style: TextStyle(color: Colors.white70, height: 1.4),
+              _isPro
+                  ? "Boat details, safety equipment, and trip history."
+                  : "Boat details, safety equipment, and trip history (Pro).",
+              style: const TextStyle(color: Colors.white70, height: 1.4),
             ),
           ),
           _linkCard(
@@ -58,22 +79,27 @@ class PrepareScreen extends StatelessWidget {
             subtitle: "PFDs and safety gear",
             onTap: () => _push(context, const SafetyEquipmentScreen()),
           ),
-          const SizedBox(height: 12),
-          _linkCard(
-            context,
-            icon: Icons.history_rounded,
-            title: "Trip history",
-            subtitle: "Past trips and logs",
-            onTap: () => _push(context, const TripHistoryScreen()),
-          ),
+          if (_isPro) ...[
+            const SizedBox(height: 12),
+            _linkCard(
+              context,
+              icon: Icons.history_rounded,
+              title: "Trip history",
+              subtitle: "Past trips and logs",
+              onTap: () => _push(context, const TripHistoryScreen()),
+              variantBackground: false,
+              showProBadge: false,
+            ),
+          ],
           const SizedBox(height: 12),
           _linkCard(
             context,
             icon: Icons.workspace_premium_rounded,
-            title: "Marine Safe Pro",
-            subtitle: "Multiple vessels, invite crew",
+            title: _isPro ? "Subscription" : "Marine Safe Pro",
+            subtitle: _isPro ? "Manage your plan" : "Unlock trip history, multiple vessels, invite crew",
             onTap: () => _push(context, const ProScreen()),
-            variantBackground: true,
+            variantBackground: !_isPro,
+            showProBadge: !_isPro,
           ),
           const SizedBox(height: 12),
           _linkCard(
@@ -82,7 +108,8 @@ class PrepareScreen extends StatelessWidget {
             title: "Join a boat",
             subtitle: "Enter code to view the same trip",
             onTap: () => _push(context, const JoinBoatScreen()),
-            variantBackground: true,
+            variantBackground: !_isPro,
+            showProBadge: !_isPro,
           ),
         ],
       ),
@@ -96,6 +123,7 @@ class PrepareScreen extends StatelessWidget {
     required String subtitle,
     required VoidCallback onTap,
     bool variantBackground = false,
+    bool showProBadge = false,
   }) {
     final cardColor = variantBackground ? _cardBgVariant : _cardBg;
     return Material(
@@ -108,13 +136,14 @@ class PrepareScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: cardColor,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: variantBackground ? _accent.withValues(alpha: 0.25) : Colors.white12),
+            border: Border.all(color: variantBackground ? _accent.withValues(alpha: 0.18) : Colors.white10),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
+          child: ClipRect(
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
                 decoration: BoxDecoration(
                   color: _accent.withValues(alpha:0.14),
                   borderRadius: BorderRadius.circular(14),
@@ -126,14 +155,45 @@ class PrepareScreen extends StatelessWidget {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (showProBadge) ...[
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: _accent.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: _accent.withValues(alpha: 0.5)),
+                              ),
+                              child: const Text(
+                                "Pro",
+                                style: TextStyle(
+                                  color: Color(0xFF2CB6FF),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -142,13 +202,17 @@ class PrepareScreen extends StatelessWidget {
                         color: Colors.white54,
                         fontSize: 13,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: Colors.white54),
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right_rounded, color: Colors.white54, size: 24),
             ],
           ),
+        ),
         ),
       ),
     );
@@ -158,6 +222,8 @@ class PrepareScreen extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => screen),
-    );
+    ).then((_) {
+      if (mounted) _loadPro();
+    });
   }
 }

@@ -11,6 +11,7 @@ const twilioFromNumber = defineSecret("TWILIO_FROM_NUMBER");
 
 const TRIPS_COLLECTION = "trips";
 const TIMEZONE = "Australia/Brisbane";
+const CLAIM_LEASE_MS = 2 * 60 * 1000;
 
 type TripDoc = {
   active?: boolean;
@@ -19,6 +20,15 @@ type TripDoc = {
   endedAtUtc?: admin.firestore.Timestamp | null;
   primarySmsSentAtUtc?: admin.firestore.Timestamp | null;
   allSmsSentAtUtc?: admin.firestore.Timestamp | null;
+  // Stage 1 (primary) tracking
+  primarySmsClaimExpiresAtMs?: number | null;
+  primarySmsToE164?: string | null;
+  primarySmsSid?: string | null;
+
+  // Stage 2 (all contacts) tracking
+  allSmsClaimExpiresAtMs?: number | null;
+  allSmsTargetPhones?: string[] | null;
+  allSmsSidsByPhone?: Record<string, string> | null;
   emergencyContacts?: Array<{ name: string; phoneE164: string; isPrimary: boolean }>;
   lastLocation?: {
     lat?: number;
@@ -96,6 +106,7 @@ export const escalateOverdueTrips = onSchedule(
     const now = DateTime.utc();
     const thirtyMinutesAgo = now.minus({ minutes: 30 }).toJSDate();
     const fortyMinutesAgo = now.minus({ minutes: 40 }).toJSDate();
+    const nowMs = Date.now();
 
     const snapshot = await db
       .collection(TRIPS_COLLECTION)
@@ -128,62 +139,127 @@ export const escalateOverdueTrips = onSchedule(
       const lastSeenStr = lastSeenLocal(ts);
       const link = mapLink(loc?.lat, loc?.lng);
 
-      // ETA + 30: primary only (transaction to prevent duplicate send)
+      // ETA + 30: primary only (lease + mark-sent-on-success)
       if (eta <= thirtyMinutesAgo && d.primarySmsSentAtUtc == null) {
         if (!primary?.phoneE164) {
           functions.logger.warn("Trip has no primary contact for SMS", { tripId: id });
           continue;
         }
+        const to = primary.phoneE164;
         let claimed = false;
         await db.runTransaction(async (tx) => {
           const fresh = await tx.get(doc.ref);
           const data = fresh.data() as TripDoc | undefined;
-          if (data?.primarySmsSentAtUtc != null) return;
-          if (data?.acknowledgedAtUtc != null || data?.endedAtUtc != null) return;
-          if (data?.active !== true) return;
+          if (!data) return;
+          if (data.primarySmsSentAtUtc != null) return;
+          if (data.acknowledgedAtUtc != null || data.endedAtUtc != null) return;
+          if (data.active !== true) return;
+          const leaseExp = data.primarySmsClaimExpiresAtMs ?? 0;
+          if (leaseExp > nowMs) return; // another runner owns lease
           tx.update(doc.ref, {
-            primarySmsSentAtUtc: admin.firestore.FieldValue.serverTimestamp(),
+            primarySmsClaimExpiresAtMs: nowMs + CLAIM_LEASE_MS,
+            primarySmsToE164: to,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAtMs: Date.now(),
+            updatedAtMs: nowMs,
           });
           claimed = true;
         });
         if (claimed) {
           const body = buildPrimarySms(d, etaLocalStr, lastSeenStr, link);
-          const sid = await sendSms(primary.phoneE164, body);
-          functions.logger.info("Primary SMS sent", { tripId: id, sid: sid ?? "failed" });
+          const result = await sendSms(to, body);
+          if (result.ok) {
+            await doc.ref.update({
+              primarySmsSentAtUtc: admin.firestore.FieldValue.serverTimestamp(),
+              primarySmsSid: result.sid,
+              primarySmsToE164: result.toE164,
+              primarySmsClaimExpiresAtMs: null,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAtMs: Date.now(),
+            });
+            functions.logger.info("Primary SMS sent", { tripId: id, stage: "primary", to: result.toE164, sid: result.sid });
+          } else {
+            await doc.ref.update({
+              primarySmsClaimExpiresAtMs: null,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAtMs: Date.now(),
+            });
+            functions.logger.error("Primary SMS send failed", { tripId: id, stage: "primary", to: result.toE164, error: result.error });
+          }
         }
       }
 
-      // ETA + 40: all contacts (transaction to prevent duplicate send)
+      // ETA + 40: all contacts (lease + per-recipient dedupe + mark stage only after all success)
       if (eta <= fortyMinutesAgo) {
         let claimed = false;
-        let allContacts: TripDoc["emergencyContacts"] = [];
+        let targetPhones: string[] = [];
+        let sidsByPhone: Record<string, string> = {};
         await db.runTransaction(async (tx) => {
           const fresh = await tx.get(doc.ref);
           const freshData = fresh.data() as TripDoc | undefined;
-          if (freshData?.allSmsSentAtUtc != null) return;
-          if (freshData?.acknowledgedAtUtc != null || freshData?.endedAtUtc != null) return;
-          if (freshData?.active !== true) return;
+          if (!freshData) return;
+          if (freshData.allSmsSentAtUtc != null) return;
+          if (freshData.acknowledgedAtUtc != null || freshData.endedAtUtc != null) return;
+          if (freshData.active !== true) return;
+          const leaseExp = freshData.allSmsClaimExpiresAtMs ?? 0;
+          if (leaseExp > nowMs) return;
+
           const contacts = freshData.emergencyContacts ?? [];
-          if (contacts.length === 0) return;
-          allContacts = contacts;
+          const phones = contacts
+            .map((c) => (c.phoneE164 ?? "").trim())
+            .filter((p) => p.length > 0);
+          if (phones.length === 0) return;
+
+          targetPhones = phones;
+          sidsByPhone = freshData.allSmsSidsByPhone ?? {};
+
           tx.update(doc.ref, {
-            allSmsSentAtUtc: admin.firestore.FieldValue.serverTimestamp(),
+            allSmsClaimExpiresAtMs: nowMs + CLAIM_LEASE_MS,
+            allSmsTargetPhones: phones,
+            allSmsSidsByPhone: sidsByPhone,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAtMs: Date.now(),
+            updatedAtMs: nowMs,
           });
           claimed = true;
         });
-        if (claimed && allContacts.length > 0) {
+        if (claimed && targetPhones.length > 0) {
           const bodyAll = buildAllContactsSms(d, etaLocalStr, lastSeenStr, link);
-          let sent = 0;
-          for (const c of allContacts) {
-            if (!c.phoneE164) continue;
-            const sid = await sendSms(c.phoneE164, bodyAll);
-            if (sid) sent++;
+          let sentThisRun = 0;
+          let failedThisRun = 0;
+          for (const toRaw of targetPhones) {
+            if (sidsByPhone[toRaw]) continue;
+            const result = await sendSms(toRaw, bodyAll);
+            if (result.ok) {
+              sentThisRun++;
+              await doc.ref.update({
+                [`allSmsSidsByPhone.${toRaw}`]: result.sid,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAtMs: Date.now(),
+              });
+              sidsByPhone[toRaw] = result.sid;
+              functions.logger.info("Escalation SMS sent", { tripId: id, stage: "all", to: result.toE164, sid: result.sid });
+            } else {
+              failedThisRun++;
+              functions.logger.error("Escalation SMS failed", { tripId: id, stage: "all", to: result.toE164, error: result.error });
+            }
           }
-          functions.logger.info("All-contacts SMS sent", { tripId: id, count: sent });
+
+          const allSucceeded = targetPhones.every((p) => Boolean(sidsByPhone[p]));
+          if (allSucceeded) {
+            await doc.ref.update({
+              allSmsSentAtUtc: admin.firestore.FieldValue.serverTimestamp(),
+              allSmsClaimExpiresAtMs: null,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAtMs: Date.now(),
+            });
+            functions.logger.info("All-contacts SMS stage complete", { tripId: id, targetCount: targetPhones.length, sentThisRun, failedThisRun });
+          } else {
+            await doc.ref.update({
+              allSmsClaimExpiresAtMs: null,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAtMs: Date.now(),
+            });
+            functions.logger.warn("All-contacts SMS stage incomplete (will retry)", { tripId: id, targetCount: targetPhones.length, sentThisRun, failedThisRun });
+          }
         }
       }
     }

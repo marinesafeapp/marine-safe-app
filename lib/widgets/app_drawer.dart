@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -62,14 +63,16 @@ class AppDrawer extends StatelessWidget {
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        adminUnlocked ? "Admin: UNLOCKED ✅" : "Admin: LOCKED 🔒",
-                        style: TextStyle(
-                          color: adminUnlocked ? Colors.greenAccent : Colors.white54,
-                          fontWeight: FontWeight.w700,
+                      if (kDebugMode) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          adminUnlocked ? "Admin: UNLOCKED ✅" : "Admin: LOCKED 🔒",
+                          style: TextStyle(
+                            color: adminUnlocked ? Colors.greenAccent : Colors.white54,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -94,35 +97,35 @@ class AppDrawer extends StatelessWidget {
                     label: "My Profile",
                     go: () => _push(context, const ProfileScreen()),
                   ),
-                  const Divider(color: Colors.white12),
-
-                  _item(
-                    context,
-                    icon: Icons.lock_rounded,
-                    label: "Admin Login",
-                    go: () async {
-                      Navigator.pop(context);
-                      final unlockedNow = await Navigator.push<bool>(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
-                      );
-
-                      if (unlockedNow == true && context.mounted) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const ModeratorScreen()),
-                        );
-                      }
-                    },
-                  ),
-
-                  if (adminUnlocked)
+                  if (kDebugMode) ...[
+                    const Divider(color: Colors.white12),
                     _item(
                       context,
-                      icon: Icons.admin_panel_settings_rounded,
-                      label: "Moderator",
-                      go: () => _push(context, const ModeratorScreen()),
+                      icon: Icons.lock_rounded,
+                      label: "Admin Login",
+                      go: () async {
+                        Navigator.pop(context);
+                        final unlockedNow = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
+                        );
+
+                        if (unlockedNow == true && context.mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ModeratorScreen()),
+                          );
+                        }
+                      },
                     ),
+                    if (adminUnlocked)
+                      _item(
+                        context,
+                        icon: Icons.admin_panel_settings_rounded,
+                        label: "Moderator",
+                        go: () => _push(context, const ModeratorScreen()),
+                      ),
+                  ],
                 ],
               ],
             );

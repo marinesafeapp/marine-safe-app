@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io' show Platform;
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_background_service/flutter_background_service.dart';
@@ -8,12 +7,18 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../screens/home/services/trip_prefs.dart';
 import 'gps_tracking_service.dart';
 
-/// Keeps the app process alive during an active trip so overdue alerts fire
-/// even when the app is closed (Samsung/Android often don't deliver
-/// scheduled notifications when the app is killed).
+/// Keeps the app process alive during an active trip so GPS tracking and
+/// foreground status updates continue when the app is closed.
+///
+/// IMPORTANT:
+/// OS-level scheduled notifications are the single source of truth for:
+/// - Due at ETA
+/// - Overdue at ETA + 5 min
+/// - Escalating notifications after that
+///
+/// This service must NOT emit its own overdue system notification.
 const String _channelId = 'marine_safe_trip_foreground';
 const int _foregroundNotifId = 1999;
-const int _overdueNotifId = 2002; // match HomeNotificationsService.notifOverdueId
 
 @pragma('vm:entry-point')
 Future<void> tripServiceOnStart(ServiceInstance service) async {
@@ -42,48 +47,30 @@ Future<void> tripServiceOnStart(ServiceInstance service) async {
 
     final etaIso = await TripPrefs.getEtaIso();
     final overdueAck = await TripPrefs.getOverdueAck();
-    final overdueNotifSent = await TripPrefs.getOverdueNotifSent();
     final rampName = await TripPrefs.getRampName() ?? 'your ramp';
 
-    if (etaIso == null || overdueAck || overdueNotifSent) return;
+    if (etaIso == null) return;
 
     final eta = DateTime.tryParse(etaIso);
     final now = DateTime.now();
-    final overdueThreshold = eta?.add(const Duration(minutes: 1));
-    if (overdueThreshold == null || !now.isAfter(overdueThreshold)) return;
-
     if (!pluginReady) return;
 
-    // ✅ Fire ONCE per trip after overdue, even if service keeps running.
-    await TripPrefs.setOverdueNotifSent(true);
-    await plugin.show(
-      _overdueNotifId,
-      'Marine Safe',
-      'OVERDUE return from $rampName — open app to acknowledge',
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          'marine_safe_overdue_v4',
-          'Marine Safe Overdue Alerts',
-          channelDescription: 'Overdue return alerts',
-          importance: Importance.max,
-          priority: Priority.high,
-          enableVibration: true,
-          vibrationPattern: Int64List.fromList([0, 800, 250, 800, 250, 1200]),
-          playSound: true,
-        ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentSound: true,
-          presentBadge: true,
-        ),
-      ),
-    );
-
+    // Foreground ongoing notification only (never a separate overdue alert).
     if (service is AndroidServiceInstance && await service.isForegroundService()) {
+      final overdueThreshold = eta?.add(const Duration(minutes: 5));
+      final isOverdue = overdueThreshold != null && now.isAfter(overdueThreshold);
+      final title = overdueAck
+          ? 'Trip acknowledged — Marine Safe'
+          : (isOverdue ? 'OVERDUE — Marine Safe' : 'Trip active — Marine Safe');
+      final body = overdueAck
+          ? 'Alerts cancelled. Trip still active.'
+          : (isOverdue
+              ? 'Return from $rampName — open app to acknowledge'
+              : 'Tracking to $rampName (ETA set)');
       await plugin.show(
         _foregroundNotifId,
-        'OVERDUE — Marine Safe',
-        'Return from $rampName — open app to acknowledge',
+        title,
+        body,
         NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,

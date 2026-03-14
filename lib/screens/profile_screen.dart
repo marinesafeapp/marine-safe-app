@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -49,8 +50,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // ---------- UI state ----------
   bool _loaded = false;
   bool _dirty = false;
-  bool _userExpanded = true;
-  bool _emg1Expanded = true;
+  bool _userExpanded = false;
+  bool _emg1Expanded = false;
   bool _emg2Expanded = false;
 
   @override
@@ -322,68 +323,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
 
-          const SizedBox(height: 18),
-          const Divider(color: Colors.white12),
-          const SizedBox(height: 12),
-          FutureBuilder<bool>(
-            future: _isAdminUnlocked(),
-            builder: (context, snap) {
-              final adminUnlocked = snap.data == true;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.lock_rounded, color: Colors.white70),
-                    title: const Text(
-                      "Admin Login",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    onTap: () async {
-                      final unlockedNow = await Navigator.push<bool>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AdminLoginScreen(),
-                        ),
-                      );
-                      if (unlockedNow == true && context.mounted) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ModeratorScreen(),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                  if (adminUnlocked)
+          if (kDebugMode) ...[
+            const SizedBox(height: 18),
+            const Divider(color: Colors.white12),
+            const SizedBox(height: 12),
+            FutureBuilder<bool>(
+              future: _isAdminUnlocked(),
+              builder: (context, snap) {
+                final adminUnlocked = snap.data == true;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                     ListTile(
-                      leading: const Icon(
-                        Icons.admin_panel_settings_rounded,
-                        color: Colors.white70,
-                      ),
+                      leading: const Icon(Icons.lock_rounded, color: Colors.white70),
                       title: const Text(
-                        "Moderator",
+                        "Admin Login",
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      onTap: () {
-                        Navigator.push(
+                      onTap: () async {
+                        final unlockedNow = await Navigator.push<bool>(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const ModeratorScreen(),
+                            builder: (_) => const AdminLoginScreen(),
                           ),
                         );
+                        if (unlockedNow == true && context.mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ModeratorScreen(),
+                            ),
+                          );
+                        }
                       },
                     ),
-                ],
-              );
-            },
-          ),
+                    if (adminUnlocked)
+                      ListTile(
+                        leading: const Icon(
+                          Icons.admin_panel_settings_rounded,
+                          color: Colors.white70,
+                        ),
+                        title: const Text(
+                          "Moderator",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ModeratorScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                );
+              },
+            ),
+          ],
           const SizedBox(height: 18),
           if (_dirty)
             const Text(

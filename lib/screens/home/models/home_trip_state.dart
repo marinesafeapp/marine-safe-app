@@ -23,7 +23,8 @@ class HomeTripState {
 
   bool get isOverdue {
     if (!tripActive || eta == null) return false;
-    return DateTime.now().isAfter(eta!);
+    // Overdue stage is defined by OS escalation schedule: ETA + 5 minutes.
+    return DateTime.now().isAfter(eta!.add(const Duration(minutes: 5)));
   }
 
   bool get isApproaching {
@@ -65,6 +66,9 @@ class HomeTripState {
     final iso = await TripPrefs.getEtaIso();
     eta = iso == null ? null : DateTime.tryParse(iso);
 
+    final departAtIso = await TripPrefs.getDepartAtIso();
+    departAt = departAtIso == null ? null : DateTime.tryParse(departAtIso);
+
     overdueAcknowledged = await TripPrefs.getOverdueAck();
 
     personsOnBoard = await TripPrefs.getPersonsOnBoard();
@@ -78,6 +82,7 @@ class HomeTripState {
     await TripPrefs.setTripActive(tripActive);
     await TripPrefs.setRampId(selectedRamp?.id);
     await TripPrefs.setEtaIso(eta?.toIso8601String());
+    await TripPrefs.setDepartAtIso(departAt?.toIso8601String());
     await TripPrefs.setOverdueAck(overdueAcknowledged);
     await TripPrefs.setPersonsOnBoard(personsOnBoard);
   }
@@ -120,6 +125,7 @@ class HomeTripState {
 
     await TripPrefs.setTripActive(false);
     await TripPrefs.setEtaIso(null);
+    await TripPrefs.setDepartAtIso(null);
     await TripPrefs.setOverdueAck(false);
   }
 }

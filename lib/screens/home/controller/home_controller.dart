@@ -17,7 +17,6 @@ import '../services/home_notifications_service.dart';
 import '../services/exact_alarm_permission_service.dart';
 
 import '../../../services/fix_issue_router.dart';
-import '../../../services/reliability/reliability_check_service.dart';
 import '../../../screens/reliability/reliability_check_screen.dart';
 
 import '../widgets/compliance_disclaimer_dialog.dart';
@@ -31,10 +30,14 @@ import '../../../services/expiry_notification_scheduler.dart';
 import '../../../services/trip_cloud_service.dart';
 import '../../../services/trip/trip_escalation_service.dart';
 import '../../../services/trip_foreground_service.dart';
+import '../../../services/local_storage_service.dart';
 import '../../../services/user_profile_service.dart';
 import '../../../services/vessels_service.dart';
 
 class HomeController extends ChangeNotifier with WidgetsBindingObserver {
+  /// Notifier for shell UI (e.g. hide bottom nav when trip is active). Listen from MainShell.
+  static final ValueNotifier<bool> tripActiveNotifier = ValueNotifier<bool>(false);
+
   final HomeTripState state = HomeTripState();
 
   final HomeNotificationsService _notifs = HomeNotificationsService();
@@ -170,6 +173,7 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
     final ack = await TripPrefs.getOverdueAck();
 
     state.tripActive = tripActive;
+    tripActiveNotifier.value = tripActive;
     state.overdueAcknowledged = ack;
 
     if (etaIso != null) {
@@ -352,19 +356,24 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
     if (state.overdueAcknowledged) return;
 
     final now = DateTime.now();
-    if (!now.isAfter(state.eta!)) return;
+    // Overdue stage aligns with OS schedule: ETA + 5 minutes
+    if (!now.isAfter(state.eta!.add(const Duration(minutes: 5)))) return;
 
     if (!state.overdueAlertFiredThisTrip) {
       state.overdueAlertFiredThisTrip = true;
 
-      // ✅ App is open: show the in-app overdue flow, but do NOT spam notifications.
-      // Also mark the overdue alert as sent so background service doesn't re-fire when reopened.
+      // ✅ App is open: show the in-app overdue flow, but do NOT emit extra system notifications.
+      // Also cancel any legacy scheduled repeats from older versions.
       await TripPrefs.setOverdueNotifSent(true);
       await _notifs.cancelOverdueRepeats();
 
       await _safeCloudUpsert();
 
       if (!context.mounted) return;
+      // Strong dedupe across restarts (only once we know we can actually present UI).
+      final alreadyRecorded = await TripPrefs.getOverdueRecorded();
+      if (alreadyRecorded) return;
+      await TripPrefs.setOverdueRecorded(true);
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!context.mounted) return;
         if (state.overdueAcknowledged) return;
@@ -377,6 +386,10 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
     await TripEscalationService.instance.acknowledgeTrip();
     state.overdueAcknowledged = true;
     await TripPrefs.setOverdueAck(true); // Persist so _rehydrateFromPrefs doesn't overwrite
+    // Ensure any legacy/local overdue schedules are cancelled too.
+    try {
+      await _notifs.cancelAll();
+    } catch (_) {}
     notifyListeners();
     try {
       await _cloud.setAcknowledged();
@@ -496,6 +509,7 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
       await TripPrefs.setEtaIso(state.eta!.toIso8601String()); // ✅
     }
     await TripPrefs.setOverdueNotifSent(false);
+    await TripPrefs.setOverdueRecorded(false);
     await _notifs.cancelOverdueRepeats();
     await _syncSchedules();
     notifyListeners();
@@ -508,6 +522,7 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
       await TripPrefs.setEtaIso(state.eta!.toIso8601String()); // ✅
     }
     await TripPrefs.setOverdueNotifSent(false);
+    await TripPrefs.setOverdueRecorded(false);
     await _notifs.cancelOverdueRepeats();
     await _syncSchedules();
     notifyListeners();
@@ -611,6 +626,7 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
     if (!context.mounted) return;
 
     state.tripActive = true;
+    tripActiveNotifier.value = true;
     state.departAt = DateTime.now();
 
     state.overdueAcknowledged = false;
@@ -620,6 +636,7 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
     await TripPrefs.setTripActive(true);
     await TripPrefs.setOverdueAck(false);
     await TripPrefs.setOverdueNotifSent(false);
+    await TripPrefs.setOverdueRecorded(false);
     if (state.selectedRamp != null) {
       await TripPrefs.setRampId(state.selectedRamp!.id);
       await TripPrefs.setRampName(state.selectedRamp!.name);
@@ -651,6 +668,25 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
 
   Future<void> endTrip() async {
     try {
+      final rampName = state.selectedRamp?.name ?? await TripPrefs.getRampName();
+      final startTime = state.departAt ?? await TripPrefs.getDepartAtIso().then((iso) => iso != null ? DateTime.tryParse(iso) : null);
+      final stopTime = DateTime.now();
+      final eta = state.eta;
+      final name = (rampName != null && rampName.isNotEmpty) ? rampName : 'Unknown ramp';
+      final entry = <String, dynamic>{
+        'rampName': name,
+        'startTime': startTime?.toIso8601String(),
+        'stopTime': stopTime.toIso8601String(),
+        if (eta != null) 'eta': eta.toIso8601String(),
+      };
+      final history = await LocalStorageService.loadTripHistory();
+      history.insert(0, entry);
+      await LocalStorageService.saveTripHistory(history);
+    } catch (e, st) {
+      debugPrint('Failed to save trip to history: $e\n$st');
+    }
+
+    try {
       await TripEscalationService.instance.cancelForTrip();
       await _notifs.cancelAll();
       try {
@@ -665,8 +701,10 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
     await TripPrefs.setRampName(null);
     await TripPrefs.setOverdueAck(false);
     await TripPrefs.setOverdueNotifSent(false);
+    await TripPrefs.setOverdueRecorded(false);
 
     await state.endTripAndClearTripOnly();
+    tripActiveNotifier.value = false;
     notifyListeners();
 
     await _safeCloudMarkEnded();

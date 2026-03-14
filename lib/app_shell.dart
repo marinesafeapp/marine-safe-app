@@ -8,6 +8,7 @@ import 'screens/profile_screen.dart';
 import 'screens/boat_details_screen.dart';
 import 'screens/emergency_contacts_screen.dart';
 import 'screens/safety_equipment_screen.dart';
+import 'services/user_profile_service.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -16,13 +17,37 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _index = 0;
+  bool _isPro = false;
 
   final screens = const [
     HomeScreen(),
     RampsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadPro();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _loadPro();
+  }
+
+  Future<void> _loadPro() async {
+    final isPro = await UserProfileService.instance.getIsPro();
+    if (mounted) setState(() => _isPro = isPro);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +56,6 @@ class _AppShellState extends State<AppShell> {
         backgroundColor: Colors.black,
         title: const Text("Marine Safe"),
       ),
-
       drawer: Drawer(
         backgroundColor: const Color(0xFF11161C),
         child: ListView(
@@ -71,11 +95,12 @@ class _AppShellState extends State<AppShell> {
               screen: const SafetyEquipmentScreen(),
             ),
 
-            drawerItem(
-              icon: Icons.history,
-              label: "Trip History",
-              screen: const TripHistoryScreen(),
-            ),
+            if (_isPro)
+              drawerItem(
+                icon: Icons.history,
+                label: "Trip History",
+                screen: const TripHistoryScreen(),
+              ),
 
             drawerItem(
               icon: Icons.settings,
@@ -118,7 +143,9 @@ class _AppShellState extends State<AppShell> {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => screen),
-        );
+        ).then((_) {
+          if (mounted) _loadPro();
+        });
       },
     );
   }

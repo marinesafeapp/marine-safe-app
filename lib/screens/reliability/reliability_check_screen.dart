@@ -146,7 +146,7 @@ class _ReliabilityCheckScreenState extends State<ReliabilityCheckScreen>
                     ),
                   ],
 
-                  if (widget.showContinueButton && _status.notificationsGranted) ...[
+                  if (widget.showContinueButton) ...[
                     const SizedBox(height: 32),
                     SizedBox(
                       height: 52,
@@ -158,15 +158,29 @@ class _ReliabilityCheckScreenState extends State<ReliabilityCheckScreen>
                           backgroundColor: _accent,
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text(
-                          "Continue",
-                          style: TextStyle(
+                        child: Text(
+                          _status.notificationsGranted
+                              ? "Continue"
+                              : "Continue anyway",
+                          style: const TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 16,
                           ),
                         ),
                       ),
                     ),
+                    if (!_status.notificationsGranted)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          "You can enable notifications later in Settings.",
+                          style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: 13,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                   ],
                 ],
               ),

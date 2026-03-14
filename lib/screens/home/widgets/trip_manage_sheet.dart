@@ -91,16 +91,24 @@ class TripManageSheet extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Icon(Icons.groups_rounded, size: 20, color: Colors.white70),
-                            const SizedBox(width: 8),
-                            Text(
-                              'People on board: $personsOnBoard',
-                              style: const TextStyle(fontSize: 14, color: Colors.white70),
-                            ),
-                          ],
+                        Expanded(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.groups_rounded, size: 20, color: Colors.white70),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  'People on board: $personsOnBoard',
+                                  style: const TextStyle(fontSize: 14, color: Colors.white70),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Text(
                           'Change',
                           style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.primary),

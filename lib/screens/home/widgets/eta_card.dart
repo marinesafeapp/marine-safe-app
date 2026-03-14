@@ -42,13 +42,17 @@ class EtaCard extends StatelessWidget {
                 color: isOverdue ? Colors.redAccent : accent,
               ),
               const SizedBox(width: 10),
-              Text(
-                isOverdue ? "RETURN ETA (OVERDUE)" : "RETURN ETA",
-                style: TextStyle(
-                  fontSize: 12,
-                  letterSpacing: 1.3,
-                  fontWeight: FontWeight.w900,
-                  color: isOverdue ? Colors.redAccent : Colors.white70,
+              Expanded(
+                child: Text(
+                  isOverdue ? "RETURN ETA (OVERDUE)" : "RETURN ETA",
+                  style: TextStyle(
+                    fontSize: 12,
+                    letterSpacing: 1.3,
+                    fontWeight: FontWeight.w900,
+                    color: isOverdue ? Colors.redAccent : Colors.white70,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
