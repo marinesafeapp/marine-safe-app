@@ -22,23 +22,23 @@ Marine Safe is a marine safety app that helps skippers stay accountable on the w
 
 ### Main navigation (tabs)
 
-- **Gear (Prepare)** — Shortcuts to Boat details, Safety equipment, Trip history, Pro, Join boat.
-- **Forecast** — **Weather** (forecast by postcode/GPS) and link to **Tides**.
-- **Trip (Home)** — Core trip flow: select ramp, set ETA, start/end trip, manage trip, overdue alerts, quick actions (Tides, Can we fish here?, Fishing rules).
-- **Profile** — Name, email, phone, postcode; Emergency contacts 1 & 2; cloud sync; Admin login, Moderator access.
+- **Gear (Prepare)** — Shortcuts to Boat details, Safety equipment, Trip history (Pro), Marine Safe Pro, Join boat.
+- **Forecast** — **Weather** (forecast by postcode/GPS) with categories (Weather, Rainfall, Wind, Sun, UV, Tides, Swell, Weekly); marine data (wave height, swell, sea surface temp); link to **Tides** screen via drawer.
+- **Trip (Home)** — Core trip flow: select ramp, set ETA, start/end trip, manage trip, overdue alerts, quick actions (Tide times, Can we fish here?, Fishing rules).
+- **Profile** — Name, email, phone, postcode; Emergency contact 1 (primary) & 2; save to device + cloud; Admin login (debug) → Moderator.
 - **Sponsors** — Sponsor list/content.
 
 ---
 
 ### Trip management (Trip tab)
 
-- **Select launch ramp** from Australian ramps list (filter by postcode / “closest within 200 km”); mark favourites.
+- **Select launch ramp** from Australian ramps list: filter by postcode (“Near your postcode within 200 km”), **favourites** chips, or “Near me” (GPS); mark favourites.
 - **Set return ETA** (time picker).
-- **Start trip** — Saves trip active, ramp, ETA, vessel name; starts Android foreground service so alerts fire when app is closed.
+- **Start trip** — Saves trip active, ramp, ETA, vessel name; starts Android foreground service so alerts fire when app is closed. **Pro**: choose vessel when multiple vessels exist.
 - **Manage trip** (bottom sheet) — Extend ETA (+30 min / +1 hr), people on board, Acknowledge overdue, Text emergency contact, End trip; **Invite crew** (join code + QR) for Pro.
 - **End trip** — Confirmation; clears trip state, stops service, cancels all escalation, syncs “ended” to cloud.
-- **Trip status** — “Trip in progress” / “Ready to go”; overdue state and in-app overdue dialog.
-- **GPS tracking** during trip (points stored locally, synced to Firestore when online); last known location used in escalation SMS.
+- **Trip status** — “Trip in progress” / “Ready to go”; overdue state and in-app overdue dialog; **ACKNOWLEDGE OVERDUE** when overdue.
+- **GPS tracking** during trip (points stored locally in SQLite, synced to Firestore when online); last known location used in escalation SMS.
 
 ---
 
@@ -61,59 +61,59 @@ Marine Safe is a marine safety app that helps skippers stay accountable on the w
 
 ### Profile & emergency contacts
 
-- **Profile**: Display name, email, phone, postcode; Emergency contact 1 & 2 (name, phone, relation); saved to device and Firestore.
-- **Emergency contacts** screen (drawer): Add/remove contacts (name, phone) for escalation and “Text emergency contact.”
-- Primary contact used for escalation SMS and notification text (“Send to [name]”).
+- **Profile**: Display name, email, phone, postcode; Emergency contact 1 (primary) & 2 (name, phone, relation); saved to device and Firestore.
+- Emergency contacts are edited in Profile (expandable sections); primary contact used for escalation SMS and notification text (“Send to [name]”).
 
 ---
 
 ### Boat & safety
 
-- **Boat details** — Add/edit vessels (name, type, rego, trailer rego, expiry); Pro can have multiple vessels and select one for the trip.
-- **Safety equipment** — Checklist (PFDs, etc.) per vessel; stored in TripPrefs; **compliance** check before starting a trip (rego, gear) and optional disclaimer.
+- **Boat details** — Default boat: name, boat rego, boat rego expiry, trailer rego, trailer rego expiry; **boat photo(s)** (one free; Pro: more, up to 10). **Pro**: multiple **vessels** (boat or jet ski), add/edit per vessel (name, type, rego, trailer, expiry); select vessel for the trip from Trip tab.
+- **Safety equipment** — Checklist per vessel (or default): PFDs (inspection due), EPIRB expiry, flares expiry, extinguisher (present + expiry). Stored in TripPrefs; **compliance** check before starting a trip (rego, gear) and optional disclaimer.
 - **Compliance** — Alerts if boat rego or safety gear is missing or incomplete when starting a trip.
 
 ---
 
 ### Info & quick actions (Trip tab)
 
-- **Tides** — Tide times.
+- **Tide times** — Tide times (TidesScreen).
 - **Can we fish here?** — Fishing eligibility.
 - **Fishing rules** — Fishing rules content.
-- Quick action bar: Tides, Can we fish here?, Fishing rules.
+- Quick action bar on Trip: Tide times, Fish here?, Rules.
 
 ---
 
 ### Pro & crew
 
-- **Pro** — Multiple vessels; “Invite crew” (join code + QR) so others can view the trip.
+- **Pro** — Multiple vessels; boat photos (up to 10); Trip history; “Invite crew” (join code + QR) so others can view the trip.
 - **Join boat** — Enter join code to view someone else’s trip (read-only summary).
 
 ---
 
 ### Admin & moderator
 
-- **Admin login** (from Profile) — Ramp list, sponsor manager, settings manager.
-- **Moderator** (from Profile) — List of active/ended trips; open user/trip details (ramp, ETA, last location, phone, emergency contact); **End trip** for a user (writes to Firestore).
+- **Admin login** (from Profile, debug only) — Unlocks **Moderator** access.
+- **Moderator** — List of active/ended trips (filter: all / overdue / active); search; open **trip details**: Live summary (ramp, ETA, people on board, status, overdue ack), User profile (name, phone, email), Emergency contact, Safety quick view (PFD count, flares/EPIRB/extinguisher dates), Trip details, **last known location** (map when overdue); **End trip** for a user (writes to Firestore).
 
 ---
 
 ### Settings & reliability
 
-- **Settings** — Reliability / notification check screen; other app settings.
+- **Reliability / notification** — Shown once after registration or first trip; option to open notification/battery settings.
 - **Battery optimisation** — Android prompt (e.g. Samsung) so notifications aren’t blocked.
 - **Exact alarms** — Android permission for on-time escalation notifications.
-- **Trip history** (drawer) — List of past trips (from cloud/local).
+- **Trip history** (Gear tab, Pro only) — List of past trips (ramp, start, stop, ETA) from local/cloud storage.
 
 ---
 
 ### Technical / backend
 
-- **Firebase**: Auth (anonymous), Firestore (profile, trips, trip codes, GPS points, moderator data), Crashlytics.
+- **Firebase**: Auth (anonymous), Firestore (users profile, trips, trip codes, GPS points, moderator data), Crashlytics.
 - **Local notifications** — Scheduled at ETA, ETA+5, +10, +20, +30, +60; payloads for “open SMS” on tap.
 - **Foreground service** (Android) — Keeps trip active so overdue checks and notifications run when app is killed.
 - **Trip cloud** — Upsert trip (ramp, ETA, active, overdue ack); mark ended; join codes for crew.
-- **Escalation** — All scheduled notifications cancelled on “I’m Safe” or End trip; rescheduled when ETA is extended.
+- **GPS tracking** — SQLite locally; sync points to Firestore when online; last location in escalation SMS.
+- **Escalation** — All scheduled notifications cancelled on “I’m Safe” (acknowledge) or End trip; rescheduled when ETA is extended.
 
 ---
 

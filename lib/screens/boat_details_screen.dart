@@ -36,6 +36,12 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
   List<Vessel> _vessels = [];
   List<String> _boatPhotoPaths = [];
 
+  // Collapsible section state (vessels tab: everything minimised, dropdown menus)
+  bool _expandedDefaultBoat = true;
+  bool _expandedBoatPhotos = false;
+  bool _expandedVessels = false;
+  final Set<String> _expandedVesselIds = {};
+
   static const Color _bg = Color(0xFF02050A);
   static const Color _accent = Color(0xFF2CB6FF);
 
@@ -76,10 +82,12 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
     _isPro = await UserProfileService.instance.getIsPro();
     _vessels = await VesselsService.instance.getVessels();
     _boatPhotoPaths = await BoatService.getBoatPhotoPaths();
-    if (mounted) setState(() {
-      _loaded = true;
-      _formDirty = false;
-    });
+    if (mounted) {
+      setState(() {
+        _loaded = true;
+        _formDirty = false;
+      });
+    }
   }
 
   int get _maxBoatPhotos =>
@@ -121,10 +129,12 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
     if (mounted) setState(() => _boatPhotoPaths = newList);
   }
 
-  Widget _boatPhotoSection() {
+  Widget _boatPhotoSectionContent() {
     const size = 120.0;
     const spacing = 12.0;
-    return _card(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -226,6 +236,10 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
           ),
       ],
     );
+  }
+
+  Widget _boatPhotoSection() {
+    return _card(children: [_boatPhotoSectionContent()]);
   }
 
   static DateTime? _parseIso(String? s) {
@@ -330,50 +344,63 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
                     _goProCard(),
                     const SizedBox(height: 24),
                   ],
-                  _sectionLabel(_isPro ? "Default boat" : "Boat & trailer"),
-                  _card(
-                    children: [
-                      _textField(_boatNameCtrl, "Boat name", Icons.directions_boat_rounded),
-                      const SizedBox(height: 12),
-                      _textField(_regoCtrl, "Boat rego", Icons.badge_rounded),
-                      _dateRow("Boat rego expiry", _boatRegoExpiry, (d) => setState(() { _boatRegoExpiry = d; _formDirty = true; }), () => setState(() { _boatRegoExpiry = null; _formDirty = true; })),
-                      const SizedBox(height: 12),
-                      _textField(_trailerCtrl, "Trailer rego", Icons.badge_rounded),
-                      _dateRow("Trailer rego expiry", _trailerRegoExpiry, (d) => setState(() { _trailerRegoExpiry = d; _formDirty = true; }), () => setState(() { _trailerRegoExpiry = null; _formDirty = true; })),
-                    ],
+                  _expansionSection(
+                    title: _isPro ? "Default boat" : "Boat & trailer",
+                    expanded: _expandedDefaultBoat,
+                    onToggle: () => setState(() => _expandedDefaultBoat = !_expandedDefaultBoat),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _textField(_boatNameCtrl, "Boat name", Icons.directions_boat_rounded),
+                        const SizedBox(height: 12),
+                        _textField(_regoCtrl, "Boat rego", Icons.badge_rounded),
+                        _dateRow("Boat rego expiry", _boatRegoExpiry, (d) => setState(() { _boatRegoExpiry = d; _formDirty = true; }), () => setState(() { _boatRegoExpiry = null; _formDirty = true; })),
+                        const SizedBox(height: 12),
+                        _textField(_trailerCtrl, "Trailer rego", Icons.badge_rounded),
+                        _dateRow("Trailer rego expiry", _trailerRegoExpiry, (d) => setState(() { _trailerRegoExpiry = d; _formDirty = true; }), () => setState(() { _trailerRegoExpiry = null; _formDirty = true; })),
+                        if (_formDirty) ...[
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            height: 52,
+                            child: ElevatedButton(
+                              onPressed: _saving ? null : _save,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _accent,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
+                              child: _saving ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text("Save boat details", style: TextStyle(fontWeight: FontWeight.w800)),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                  if (_formDirty) ...[
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: _saving ? null : _save,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _accent,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        child: _saving ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text("Save boat details", style: TextStyle(fontWeight: FontWeight.w800)),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                  _sectionLabel("Boat photo(s)"),
-                  _boatPhotoSection(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+                  _expansionSection(
+                    title: "Boat photo(s)",
+                    expanded: _expandedBoatPhotos,
+                    onToggle: () => setState(() => _expandedBoatPhotos = !_expandedBoatPhotos),
+                    subtitle: _boatPhotoPaths.isEmpty ? null : '${_boatPhotoPaths.length} photo${_boatPhotoPaths.length == 1 ? '' : 's'}',
+                    child: _boatPhotoSectionContent(),
+                  ),
                   if (_isPro) ...[
-                    _sectionLabel("Vessels"),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4, bottom: 12),
-                      child: Text(
-                        _vessels.isEmpty
-                            ? "Add your first boat or jet ski to get started."
-                            : "Add boats or jet skis and switch between them for trips.",
-                        style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.35),
+                    const SizedBox(height: 16),
+                    _expansionSection(
+                      title: "Vessels",
+                      expanded: _expandedVessels,
+                      onToggle: () => setState(() => _expandedVessels = !_expandedVessels),
+                      subtitle: _vessels.isEmpty
+                          ? "Add your first boat or jet ski to get started."
+                          : "Add boats or jet skis and switch between them for trips.",
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ..._vessels.map((v) => _vesselTile(v)),
+                          _addVesselCard(),
+                        ],
                       ),
                     ),
-                    ..._vessels.map((v) => _vesselTile(v)),
-                    _addVesselCard(),
                   ],
                 ],
               ),
@@ -463,6 +490,80 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
     );
   }
 
+  /// Collapsible dropdown section: header toggles expansion, content shown when expanded.
+  Widget _expansionSection({
+    required String title,
+    required bool expanded,
+    required VoidCallback onToggle,
+    required Widget child,
+    String? subtitle,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onToggle,
+              borderRadius: BorderRadius.circular(18),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            title.toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          if (subtitle != null && subtitle.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              subtitle,
+                              style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.35),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                      color: Colors.white54,
+                      size: 28,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (expanded) ...[
+            Divider(height: 1, color: Colors.white.withValues(alpha: 0.08)),
+            Padding(
+              padding: const EdgeInsets.all(18),
+              child: child,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _card({required List<Widget> children}) {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -513,94 +614,111 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
   }
 
   Widget _vesselTile(Vessel v) {
+    final isExpanded = _expandedVesselIds.contains(v.id);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _addOrEditVessel(vessel: v),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-              boxShadow: [
-                BoxShadow(
-                  color: _accent.withValues(alpha: 0.06),
-                  blurRadius: 12,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          boxShadow: [
+            BoxShadow(
+              color: _accent.withValues(alpha: 0.06),
+              blurRadius: 12,
+              offset: const Offset(0, 2),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: _accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: _accent.withValues(alpha: 0.35)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => setState(() {
+                  if (isExpanded) {
+                    _expandedVesselIds.remove(v.id);
+                  } else {
+                    _expandedVesselIds.add(v.id);
+                  }
+                }),
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: _accent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: _accent.withValues(alpha: 0.35)),
+                        ),
+                        child: Icon(_iconForType(v.type), color: _accent, size: 22),
                       ),
-                      child: Icon(_iconForType(v.type), color: _accent, size: 26),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            v.name.isEmpty ? 'Unnamed' : v.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 17,
-                              letterSpacing: -0.2,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  _labelForType(v.type),
-                                  style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
-                                ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              v.name.isEmpty ? 'Unnamed' : v.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                                letterSpacing: -0.2,
                               ),
-                              if (v.boatRego.isNotEmpty) ...[
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Rego: ${v.boatRego}',
-                                  style: TextStyle(color: Colors.white38, fontSize: 12),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    _labelForType(v.type),
+                                    style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w600),
+                                  ),
                                 ),
+                                if (v.boatRego.isNotEmpty) ...[
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Rego: ${v.boatRego}',
+                                    style: TextStyle(color: Colors.white38, fontSize: 11),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
                               ],
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    Icon(Icons.chevron_right_rounded, color: Colors.white38, size: 22),
-                  ],
+                      Icon(
+                        isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        color: Colors.white54,
+                        size: 26,
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 12),
-                Divider(height: 1, color: Colors.white.withValues(alpha: 0.06)),
-                const SizedBox(height: 8),
-                Row(
+              ),
+            ),
+            if (isExpanded) ...[
+              Divider(height: 1, color: Colors.white.withValues(alpha: 0.06)),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Row(
                   children: [
                     _vesselAction(
                       icon: Icons.health_and_safety_rounded,
@@ -628,9 +746,9 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -825,7 +943,7 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
                               boatRegoExpiry: boatExpiry,
                               trailerRego: trailerCtrl.text.trim(),
                               trailerRegoExpiry: trailerExpiry,
-                              createdAt: isEdit ? vessel!.createdAt : now,
+                              createdAt: vessel?.createdAt ?? now,
                               updatedAt: now,
                             );
                             if (isEdit) {

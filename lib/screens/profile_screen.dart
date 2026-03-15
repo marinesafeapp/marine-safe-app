@@ -195,6 +195,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
+  // ignore: unused_element
   Future<void> _clearLocal() async {
     final p = await SharedPreferences.getInstance();
 

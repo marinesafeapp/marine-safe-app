@@ -100,7 +100,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                     SizedBox(height: 16),
                     Text(
                       'No trips logged yet.',
-                      style: const TextStyle(color: Colors.white70, fontSize: 18),
+                      style: TextStyle(color: Colors.white70, fontSize: 18),
                       textAlign: TextAlign.center,
                     ),
                     SizedBox(height: 12),

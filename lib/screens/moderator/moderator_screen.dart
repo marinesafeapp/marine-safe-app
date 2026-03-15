@@ -575,7 +575,7 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
                         Expanded(
                           child: Text(
                             hasLocation
-                                ? "Last location: ${lastLocation!['lat'].toStringAsFixed(4)}, ${lastLocation['lng'].toStringAsFixed(4)}"
+                                ? "Last location: ${lastLocation['lat'].toStringAsFixed(4)}, ${lastLocation['lng'].toStringAsFixed(4)}"
                                 : "No location available",
                             style: TextStyle(
                               color: hasLocation ? Colors.orangeAccent : Colors.white54,

@@ -914,6 +914,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _sectionLabel(String text, [IconData? icon]) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 10),
@@ -1310,10 +1311,15 @@ class _WeatherScreenState extends State<WeatherScreen> {
                     final height = (rain / maxRain).clamp(0.05, 1.0) * chartHeight;
                     final intensity = rain / 100.0;
                     Color barColor;
-                    if (intensity >= 0.7) barColor = Colors.red.shade400;
-                    else if (intensity >= 0.5) barColor = Colors.orange.shade400;
-                    else if (intensity >= 0.3) barColor = Colors.blue.shade400;
-                    else barColor = Colors.blue.shade300;
+                    if (intensity >= 0.7) {
+                      barColor = Colors.red.shade400;
+                    } else if (intensity >= 0.5) {
+                      barColor = Colors.orange.shade400;
+                    } else if (intensity >= 0.3) {
+                      barColor = Colors.blue.shade400;
+                    } else {
+                      barColor = Colors.blue.shade300;
+                    }
                     return Container(
                       width: barWidth,
                       margin: EdgeInsets.only(right: i < next24h.length - 1 ? spacing : 0),

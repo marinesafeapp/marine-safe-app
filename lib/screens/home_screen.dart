@@ -91,20 +91,24 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadVesselState() async {
     final isPro = await UserProfileService.instance.getIsPro();
     if (!isPro) {
-      if (mounted) setState(() {
-        _isPro = false;
-        _vessels = [];
-        _selectedVesselId = null;
-      });
+      if (mounted) {
+        setState(() {
+          _isPro = false;
+          _vessels = [];
+          _selectedVesselId = null;
+        });
+      }
       return;
     }
     final vessels = await VesselsService.instance.getVessels();
     final selectedId = await VesselsService.instance.getSelectedVesselId();
-    if (mounted) setState(() {
-      _isPro = true;
-      _vessels = vessels;
-      _selectedVesselId = selectedId;
-    });
+    if (mounted) {
+      setState(() {
+        _isPro = true;
+        _vessels = vessels;
+        _selectedVesselId = selectedId;
+      });
+    }
   }
 
   void _showVesselPicker(BuildContext context) {
@@ -327,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
     final name = selected != null
-        ? (selected!.name.isEmpty ? 'Unnamed' : selected!.name)
+        ? (selected.name.isEmpty ? 'Unnamed' : selected.name)
         : 'Select vessel';
     return Material(
       color: Colors.transparent,
@@ -376,6 +380,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Kept for potential reuse (e.g. ramp/ETA display)
+  // ignore: unused_element
   Widget _compactCard({
     required IconData icon,
     required String title,

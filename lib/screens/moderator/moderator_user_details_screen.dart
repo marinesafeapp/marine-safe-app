@@ -566,7 +566,7 @@ class ModeratorUserDetailsScreen extends StatelessWidget {
       );
     }
 
-    final lat = (lastLocation!['lat'] as num).toDouble();
+    final lat = (lastLocation['lat'] as num).toDouble();
     final lng = (lastLocation['lng'] as num).toDouble();
     final locationTime = _parseDate(lastLocation['timestamp']);
     final accuracy = lastLocation['accuracy'] as double?;

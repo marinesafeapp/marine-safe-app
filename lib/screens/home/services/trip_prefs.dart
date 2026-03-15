@@ -125,7 +125,7 @@ class TripPrefs {
       (await _p()).getString(_kSafetyStateJson);
 
   /// Pro: safety state per vessel. [vesselId] null/empty = default (same as getSafetyStateJson).
-  /// Key format: safety.vessel.<id> per spec.
+  /// Key format: safety.vessel.{id} per spec.
   static String _safetyKey(String? vesselId) =>
       vesselId != null && vesselId.isNotEmpty
           ? 'safety.vessel.$vesselId'

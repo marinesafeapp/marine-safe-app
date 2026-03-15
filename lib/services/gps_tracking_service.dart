@@ -202,7 +202,7 @@ class GPSTrackingService {
       final point = GPSPoint(
         latitude: position.latitude,
         longitude: position.longitude,
-        timestamp: position.timestamp ?? DateTime.now(),
+        timestamp: position.timestamp,
         speed: position.speed,
         heading: position.heading,
         accuracy: position.accuracy,
