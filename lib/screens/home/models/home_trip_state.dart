@@ -20,6 +20,7 @@ class HomeTripState {
   bool overdueAlertFiredThisTrip = false;
 
   int personsOnBoard = 0;
+  double? fuelAddedLitres;
 
   bool get isOverdue {
     if (!tripActive || eta == null) return false;
@@ -76,6 +77,8 @@ class HomeTripState {
       final last = await TripPrefs.getLastPersonsOnBoard(fallback: 0);
       if (last > 0) personsOnBoard = last;
     }
+
+    fuelAddedLitres = await TripPrefs.getFuelAddedLitres();
   }
 
   Future<void> save() async {
@@ -85,6 +88,7 @@ class HomeTripState {
     await TripPrefs.setDepartAtIso(departAt?.toIso8601String());
     await TripPrefs.setOverdueAck(overdueAcknowledged);
     await TripPrefs.setPersonsOnBoard(personsOnBoard);
+    await TripPrefs.setFuelAddedLitres(fuelAddedLitres);
   }
 
   Future<void> setRamp(Ramp ramp) async {
@@ -122,10 +126,12 @@ class HomeTripState {
 
     overdueAcknowledged = false;
     overdueAlertFiredThisTrip = false;
+    fuelAddedLitres = null;
 
     await TripPrefs.setTripActive(false);
     await TripPrefs.setEtaIso(null);
     await TripPrefs.setDepartAtIso(null);
     await TripPrefs.setOverdueAck(false);
+    await TripPrefs.setFuelAddedLitres(null);
   }
 }

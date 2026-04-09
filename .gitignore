@@ -64,6 +64,9 @@ functions/node_modules/
 .DS_Store
 Thumbs.db
 
+# iOS Simulator exports (local only; keep out of Android QA branches)
+**/Simulator Screenshot*.png
+
 # IDE
 .idea/
 .vscode/

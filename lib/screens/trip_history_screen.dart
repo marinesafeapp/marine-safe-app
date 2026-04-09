@@ -68,7 +68,18 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                     MaterialPageRoute(builder: (_) => const ProScreen()),
                   ),
                   icon: const Icon(Icons.workspace_premium_rounded),
-                  label: const Text('Marine Safe Pro'),
+                  label: Text.rich(
+                    TextSpan(
+                      children: [
+                        const TextSpan(text: 'Marine ', style: TextStyle(color: Colors.white)),
+                        TextSpan(
+                          text: 'Safe',
+                          style: TextStyle(color: const Color(0xFF2CB6FF), fontWeight: FontWeight.w800),
+                        ),
+                        const TextSpan(text: ' Pro', style: TextStyle(color: Colors.white)),
+                      ],
+                    ),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2CB6FF),
                     foregroundColor: Colors.white,
@@ -123,6 +134,10 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                   final startTime = item["startTime"]?.toString() ?? "—";
                   final stopTime = item["stopTime"]?.toString() ?? "—";
                   final eta = item["eta"]?.toString();
+                  final fuelLitresRaw = item["fuelAddedLitres"];
+                  final fuelLitres = fuelLitresRaw == null
+                      ? null
+                      : double.tryParse(fuelLitresRaw.toString());
                   return Container(
                     margin:
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -145,6 +160,11 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                         if (eta != null)
                           Text("ETA:   $eta",
                               style: const TextStyle(color: Colors.white70)),
+                        if (fuelLitres != null)
+                          Text(
+                            "Fuel:  ${fuelLitres == fuelLitres.roundToDouble() ? fuelLitres.round() : fuelLitres.toStringAsFixed(1)} L",
+                            style: const TextStyle(color: Colors.white70),
+                          ),
                       ],
                     ),
                   );

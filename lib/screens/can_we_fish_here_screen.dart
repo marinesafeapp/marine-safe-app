@@ -20,23 +20,15 @@ class _CanWeFishHereScreenState extends State<CanWeFishHereScreen> {
 
   Future<void> _openUrl(String url) async {
     final uri = Uri.parse(url);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     try {
       final launched = await launchUrl(
         uri,
         mode: LaunchMode.externalApplication,
       );
-      if (!launched && context.mounted) {
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(content: Text('Could not open link. Try again or open in a browser.')),
-        );
-      }
-    } on Exception catch (e) {
-      if (context.mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(content: Text('Could not open link: $e')),
-        );
-      }
+      // Ignore launch failures silently (no SnackBar)
+      if (!launched) return;
+    } on Exception {
+      // Silently ignore failures (no SnackBar)
     }
   }
 
@@ -45,36 +37,18 @@ class _CanWeFishHereScreenState extends State<CanWeFishHereScreen> {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(
-              content: Text(
-                  'Location services are disabled. Enable them to check your position.')),
-        );
         return;
       }
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          scaffoldMessenger.showSnackBar(
-            const SnackBar(content: Text('Location permission denied.')),
-          );
           return;
         }
       }
       if (permission == LocationPermission.deniedForever) {
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(
-              content: Text(
-                  'Location permission permanently denied. Enable it in device settings.')),
-        );
         return;
       }
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(
-            content: Text('Getting your position…'),
-            duration: Duration(seconds: 2)),
-      );
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
       );
@@ -85,11 +59,7 @@ class _CanWeFishHereScreenState extends State<CanWeFishHereScreen> {
         lon: position.longitude,
       );
     } catch (e) {
-      if (context.mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(content: Text('Could not get location: $e')),
-        );
-      }
+      // Silently ignore failures (no SnackBar)
     }
   }
 

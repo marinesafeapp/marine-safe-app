@@ -28,6 +28,7 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
 
   DateTime? _boatRegoExpiry;
   DateTime? _trailerRegoExpiry;
+  String _motorBrand = '';
 
   bool _loaded = false;
   bool _saving = false;
@@ -35,11 +36,15 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
   bool _isPro = false;
   List<Vessel> _vessels = [];
   List<String> _boatPhotoPaths = [];
+  /// Pro: which vessel is selected for trips / safety gear (persisted).
+  String? _proSelectedVesselId;
 
   // Collapsible section state (vessels tab: everything minimised, dropdown menus)
-  bool _expandedDefaultBoat = true;
+  // All sections minimised (collapsed) by default
+  bool _expandedDefaultBoat = false;
   bool _expandedBoatPhotos = false;
   bool _expandedVessels = false;
+  bool _expandedLicencesPermits = false;
   final Set<String> _expandedVesselIds = {};
 
   static const Color _bg = Color(0xFF02050A);
@@ -50,6 +55,20 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
   static const String _kTrailerRego = 'profile.trailerRego';
   static const String _kBoatRegoExpiry = 'profile.boatRegoExpiry';
   static const String _kTrailerRegoExpiry = 'profile.trailerRegoExpiry';
+  static const String _kMotorBrand = 'profile.motorBrand';
+
+  static const List<String> _motorBrands = <String>[
+    'Mercury',
+    'Yamaha',
+    'Suzuki',
+    'Honda',
+    'Evinrude',
+    'Tohatsu',
+    'Johnson',
+    'Sea-Doo',
+    'Volvo Penta',
+    'Other',
+  ];
 
   @override
   void initState() {
@@ -79,8 +98,10 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
     _trailerCtrl.text = p.getString(_kTrailerRego) ?? '';
     _boatRegoExpiry = _parseIso(p.getString(_kBoatRegoExpiry));
     _trailerRegoExpiry = _parseIso(p.getString(_kTrailerRegoExpiry));
+    _motorBrand = p.getString(_kMotorBrand) ?? '';
     _isPro = await UserProfileService.instance.getIsPro();
     _vessels = await VesselsService.instance.getVessels();
+    _proSelectedVesselId = await VesselsService.instance.getSelectedVesselId();
     _boatPhotoPaths = await BoatService.getBoatPhotoPaths();
     if (mounted) {
       setState(() {
@@ -261,6 +282,7 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
     await p.setString(_kBoatName, _boatNameCtrl.text.trim());
     await p.setString(_kBoatRego, _regoCtrl.text.trim());
     await p.setString(_kTrailerRego, _trailerCtrl.text.trim());
+    await p.setString(_kMotorBrand, _motorBrand);
     await _setIsoOrRemove(p, _kBoatRegoExpiry, _boatRegoExpiry);
     await _setIsoOrRemove(p, _kTrailerRegoExpiry, _trailerRegoExpiry);
     await ExpiryNotificationScheduler.instance.scheduleAllExpiryNotifications();
@@ -346,6 +368,8 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
                   ],
                   _expansionSection(
                     title: _isPro ? "Default boat" : "Boat & trailer",
+                    icon: Icons.directions_boat_rounded,
+                    value: _boatNameCtrl.text.trim().isEmpty ? 'Boat details' : _boatNameCtrl.text.trim(),
                     expanded: _expandedDefaultBoat,
                     onToggle: () => setState(() => _expandedDefaultBoat = !_expandedDefaultBoat),
                     child: Column(
@@ -355,6 +379,34 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
                         const SizedBox(height: 12),
                         _textField(_regoCtrl, "Boat rego", Icons.badge_rounded),
                         _dateRow("Boat rego expiry", _boatRegoExpiry, (d) => setState(() { _boatRegoExpiry = d; _formDirty = true; }), () => setState(() { _boatRegoExpiry = null; _formDirty = true; })),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: _motorBrand.isEmpty ? null : _motorBrand,
+                          decoration: InputDecoration(
+                            labelText: 'Motor brand',
+                            hintText: 'Select motor brand',
+                            filled: true,
+                            fillColor: Colors.black.withValues(alpha:0.25),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: _accent.withValues(alpha:0.6)),
+                            ),
+                          ),
+                          dropdownColor: Colors.grey.shade900,
+                          items: _motorBrands.map((b) {
+                            return DropdownMenuItem<String>(
+                              value: b,
+                              child: Text(b),
+                            );
+                          }).toList(),
+                          onChanged: (v) {
+                            setState(() {
+                              _motorBrand = v ?? '';
+                              _formDirty = true;
+                            });
+                          },
+                        ),
                         const SizedBox(height: 12),
                         _textField(_trailerCtrl, "Trailer rego", Icons.badge_rounded),
                         _dateRow("Trailer rego expiry", _trailerRegoExpiry, (d) => setState(() { _trailerRegoExpiry = d; _formDirty = true; }), () => setState(() { _trailerRegoExpiry = null; _formDirty = true; })),
@@ -376,23 +428,34 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   _expansionSection(
                     title: "Boat photo(s)",
+                    icon: Icons.photo_library_rounded,
+                    value: _boatPhotoPaths.isEmpty ? 'Add photo' : '${_boatPhotoPaths.length} photo${_boatPhotoPaths.length == 1 ? '' : 's'}',
                     expanded: _expandedBoatPhotos,
                     onToggle: () => setState(() => _expandedBoatPhotos = !_expandedBoatPhotos),
-                    subtitle: _boatPhotoPaths.isEmpty ? null : '${_boatPhotoPaths.length} photo${_boatPhotoPaths.length == 1 ? '' : 's'}',
                     child: _boatPhotoSectionContent(),
                   ),
+                  _expansionSection(
+                    title: "Licences & Permits",
+                    icon: Icons.assignment_turned_in_rounded,
+                    value: "Coming soon",
+                    expanded: _expandedLicencesPermits,
+                    onToggle: () => setState(() => _expandedLicencesPermits = !_expandedLicencesPermits),
+                    child: const Text(
+                      'A future section to track boat licence, vessel registration, and fishing permits/licences.\n\nNothing to enter yet.',
+                      style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.4),
+                    ),
+                  ),
                   if (_isPro) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
                     _expansionSection(
                       title: "Vessels",
+                      icon: Icons.directions_boat_rounded,
+                      value: _vessels.isEmpty ? 'Add vessel' : '${_vessels.length} vessel${_vessels.length == 1 ? '' : 's'}',
                       expanded: _expandedVessels,
                       onToggle: () => setState(() => _expandedVessels = !_expandedVessels),
-                      subtitle: _vessels.isEmpty
-                          ? "Add your first boat or jet ski to get started."
-                          : "Add boats or jet skis and switch between them for trips.",
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -490,19 +553,29 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
     );
   }
 
-  /// Collapsible dropdown section: header toggles expansion, content shown when expanded.
+  /// Collapsible section with same strip style as home page (Ramp/Vessel/ETA): accent container, icon, label, value, chevron.
   Widget _expansionSection({
     required String title,
+    required IconData icon,
+    String? value,
     required bool expanded,
     required VoidCallback onToggle,
     required Widget child,
     String? subtitle,
   }) {
+    final displayValue = value ?? subtitle ?? '';
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white12),
+        color: _accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _accent.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -511,31 +584,37 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
             color: Colors.transparent,
             child: InkWell(
               onTap: onToggle,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(14),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                 child: Row(
                   children: [
+                    Icon(icon, color: _accent, size: 22),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            title.toUpperCase(),
+                            title,
                             style: const TextStyle(
                               color: Colors.white54,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
                             ),
                           ),
-                          if (subtitle != null && subtitle.isNotEmpty) ...[
-                            const SizedBox(height: 4),
+                          if (displayValue.isNotEmpty) ...[
+                            const SizedBox(height: 2),
                             Text(
-                              subtitle,
-                              style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.35),
-                              maxLines: 2,
+                              displayValue,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                              ),
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
@@ -545,7 +624,7 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
                     Icon(
                       expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
                       color: Colors.white54,
-                      size: 28,
+                      size: 22,
                     ),
                   ],
                 ),
@@ -692,11 +771,13 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
                                 ),
                                 if (v.boatRego.isNotEmpty) ...[
                                   const SizedBox(width: 6),
-                                  Text(
-                                    'Rego: ${v.boatRego}',
-                                    style: TextStyle(color: Colors.white38, fontSize: 11),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  Flexible(
+                                    child: Text(
+                                      'Rego: ${v.boatRego}',
+                                      style: TextStyle(color: Colors.white38, fontSize: 11),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 ],
                               ],
@@ -718,33 +799,54 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
               Divider(height: 1, color: Colors.white.withValues(alpha: 0.06)),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Row(
-                  children: [
-                    _vesselAction(
-                      icon: Icons.health_and_safety_rounded,
-                      label: 'Safety gear',
-                      color: _accent,
-                      onTap: () async {
-                        await VesselsService.instance.setSelectedVesselId(v.id);
-                        if (!mounted) return;
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SafetyEquipmentScreen()));
-                      },
-                    ),
-                    const SizedBox(width: 16),
-                    _vesselAction(
-                      icon: Icons.edit_rounded,
-                      label: 'Edit',
-                      color: Colors.white54,
-                      onTap: () => _addOrEditVessel(vessel: v),
-                    ),
-                    const SizedBox(width: 16),
-                    _vesselAction(
-                      icon: Icons.delete_outline_rounded,
-                      label: 'Delete',
-                      color: Colors.red.shade300,
-                      onTap: () => _confirmDeleteVessel(v),
-                    ),
-                  ],
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _vesselAction(
+                        icon: Icons.health_and_safety_rounded,
+                        label: 'Safety gear',
+                        color: _accent,
+                        onTap: () async {
+                          await VesselsService.instance.setSelectedVesselId(v.id);
+                          if (!mounted) return;
+                          setState(() => _proSelectedVesselId = v.id);
+                          if (!mounted) return;
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const SafetyEquipmentScreen()));
+                        },
+                      ),
+                      const SizedBox(width: 10),
+                      _vesselAction(
+                        icon: _proSelectedVesselId == v.id
+                            ? Icons.check_circle_rounded
+                            : Icons.check_circle_outline_rounded,
+                        label: _proSelectedVesselId == v.id ? 'Selected' : 'Select',
+                        color: _proSelectedVesselId == v.id ? Colors.white38 : _accent,
+                        onTap: _proSelectedVesselId == v.id
+                            ? null
+                            : () async {
+                                await VesselsService.instance.setSelectedVesselId(v.id);
+                                if (mounted) setState(() => _proSelectedVesselId = v.id);
+                              },
+                      ),
+                      const SizedBox(width: 10),
+                      _vesselAction(
+                        icon: Icons.edit_rounded,
+                        label: 'Edit',
+                        color: Colors.white54,
+                        onTap: () => _addOrEditVessel(vessel: v),
+                      ),
+                      const SizedBox(width: 10),
+                      _vesselAction(
+                        icon: Icons.delete_outline_rounded,
+                        label: 'Delete',
+                        color: Colors.red.shade300,
+                        onTap: () => _confirmDeleteVessel(v),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -758,24 +860,28 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
     required IconData icon,
     required String label,
     required Color color,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
   }) {
+    final child = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 4),
+          Text(label, style: TextStyle(fontSize: 13, color: color, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+    if (onTap == null) {
+      return Opacity(opacity: 0.85, child: child);
+    }
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 18, color: color),
-              const SizedBox(width: 4),
-              Text(label, style: TextStyle(fontSize: 13, color: color, fontWeight: FontWeight.w500)),
-            ],
-          ),
-        ),
+        child: child,
       ),
     );
   }
@@ -835,6 +941,7 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
     if (ok == true && mounted) {
       await VesselsService.instance.deleteVessel(v.id);
       _vessels = await VesselsService.instance.getVessels();
+      _proSelectedVesselId = await VesselsService.instance.getSelectedVesselId();
       setState(() {});
     }
   }
@@ -847,6 +954,7 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
     String type = vessel?.type ?? 'boat';
     DateTime? boatExpiry = vessel?.boatRegoExpiry;
     DateTime? trailerExpiry = vessel?.trailerRegoExpiry;
+    String motorBrand = vessel?.motorBrand ?? '';
 
     await showModalBottomSheet<void>(
       context: context,
@@ -912,6 +1020,24 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
                   const SizedBox(height: 8),
                   _dateRowInSheet("Boat rego expiry", boatExpiry, (d) => setModalState(() => boatExpiry = d), () => setModalState(() => boatExpiry = null), setModalState),
                   const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: motorBrand.isEmpty ? null : motorBrand,
+                    decoration: InputDecoration(
+                      labelText: 'Motor brand',
+                      filled: true,
+                      fillColor: Colors.black26,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    dropdownColor: Colors.grey.shade900,
+                    items: _motorBrands.map((b) {
+                      return DropdownMenuItem<String>(
+                        value: b,
+                        child: Text(b),
+                      );
+                    }).toList(),
+                    onChanged: (v) => setModalState(() => motorBrand = v ?? ''),
+                  ),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: trailerCtrl,
                     decoration: InputDecoration(
@@ -943,6 +1069,7 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
                               boatRegoExpiry: boatExpiry,
                               trailerRego: trailerCtrl.text.trim(),
                               trailerRegoExpiry: trailerExpiry,
+                              motorBrand: motorBrand,
                               createdAt: vessel?.createdAt ?? now,
                               updatedAt: now,
                             );
@@ -954,6 +1081,7 @@ class _BoatDetailsScreenState extends State<BoatDetailsScreen> {
                             }
                             if (ctx.mounted) Navigator.pop(ctx);
                             _vessels = await VesselsService.instance.getVessels();
+                            _proSelectedVesselId = await VesselsService.instance.getSelectedVesselId();
                             if (mounted) setState(() {});
                           },
                           child: Text(isEdit ? 'Save' : 'Add'),

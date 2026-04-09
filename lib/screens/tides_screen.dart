@@ -135,18 +135,10 @@ class _TidesScreenState extends State<TidesScreen> {
 
   Future<void> _openBomTides() async {
     final uri = Uri.parse(_bomTidesUrl);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     try {
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!launched && context.mounted) {
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(content: Text('Could not open link. Try again in a browser.')),
-        );
-      }
-    } on Exception catch (e) {
-      if (context.mounted) {
-        scaffoldMessenger.showSnackBar(SnackBar(content: Text('Could not open link: $e')));
-      }
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } on Exception {
+      // Silently ignore failures (no SnackBar)
     }
   }
 

@@ -69,7 +69,7 @@ Marine Safe is a marine safety app that helps skippers stay accountable on the w
 ### Boat & safety
 
 - **Boat details** — Default boat: name, boat rego, boat rego expiry, trailer rego, trailer rego expiry; **boat photo(s)** (one free; Pro: more, up to 10). **Pro**: multiple **vessels** (boat or jet ski), add/edit per vessel (name, type, rego, trailer, expiry); select vessel for the trip from Trip tab.
-- **Safety equipment** — Checklist per vessel (or default): PFDs (inspection due), EPIRB expiry, flares expiry, extinguisher (present + expiry). Stored in TripPrefs; **compliance** check before starting a trip (rego, gear) and optional disclaimer.
+- **Safety equipment (per vessel)** — Safety checklist is stored **for each individual vessel**, not just globally: PFDs (inspection due), EPIRB expiry, flares expiry, extinguisher (present + expiry). When Pro users switch vessels, the app loads that vessel’s own safety state. Stored in TripPrefs; **compliance** check before starting a trip (rego, gear) and optional disclaimer.
 - **Compliance** — Alerts if boat rego or safety gear is missing or incomplete when starting a trip.
 
 ---

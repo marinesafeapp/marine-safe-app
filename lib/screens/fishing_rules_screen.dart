@@ -17,23 +17,15 @@ class _FishingRulesScreenState extends State<FishingRulesScreen> {
   static const String _freshUrl = 'https://www.qld.gov.au/recreation/activities/boating-fishing/rec-fishing/rules/limits-fresh';
   Future<void> _openUrl(String url) async {
     final uri = Uri.parse(url);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     try {
       final launched = await launchUrl(
         uri,
         mode: LaunchMode.externalApplication,
       );
-      if (!launched && context.mounted) {
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(content: Text('Could not open link. Try again or open in a browser.')),
-        );
-      }
-    } on Exception catch (e) {
-      if (context.mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(content: Text('Could not open link: $e')),
-        );
-      }
+      // Ignore failures silently (no SnackBar)
+      if (!launched) return;
+    } on Exception {
+      // Silently ignore failures (no SnackBar)
     }
   }
 

@@ -1,38 +1,487 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <base href="$FLUTTER_BASE_HREF">
-
   <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Marine Safe App — Stay accountable on the water. Set your ramp and return time; if you don’t check in, we escalate to your emergency contact with your last location. Built for Australian boaters.">
+  <title>Marine Safe App — Stay safe on the water</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #02050a;
+      --bg-elevated: #050d18;
+      --accent: #2cb6ff;
+      --accent-soft: rgba(44, 182, 255, 0.15);
+      --accent-glow: rgba(44, 182, 255, 0.25);
+      --text: #ffffff;
+      --text-muted: rgba(255, 255, 255, 0.7);
+      --border: rgba(255, 255, 255, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      overflow-x: hidden;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
 
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="marine_safe_app_fixed">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+    /* Header — extend into safe area so top isn’t cut off */
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 16px 24px;
+      padding-top: max(16px, env(safe-area-inset-top));
+      background: rgba(2, 5, 10, 0.98);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-weight: 800;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .logo span { color: var(--accent); }
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+    .nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+      padding: 8px 4px;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+    }
+    .nav a:hover { color: var(--accent); }
+    .nav a:active { opacity: 0.8; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 24px;
+      min-height: 44px;
+      min-width: 44px;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 0.95rem;
+      border-radius: 12px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      border: none;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(44, 182, 255, 0.35);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(44, 182, 255, 0.45);
+    }
+    .btn-outline {
+      background: transparent;
+      color: var(--accent);
+      border: 2px solid var(--accent);
+    }
+    .btn-outline:hover {
+      background: var(--accent-soft);
+      transform: translateY(-1px);
+    }
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+    /* Hero — enough top padding to clear fixed header + safe area */
+    .hero {
+      padding: 100px 24px 80px;
+      padding-top: max(100px, calc(72px + env(safe-area-inset-top)));
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      position: relative;
+      background:
+        radial-gradient(ellipse 100% 80% at 50% -10%, rgba(44, 182, 255, 0.18), transparent 50%),
+        radial-gradient(ellipse 60% 40% at 80% 20%, rgba(44, 182, 255, 0.06), transparent),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-elevated) 100%);
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(44, 182, 255, 0.2), transparent);
+      opacity: 0.6;
+    }
+    .hero h1 {
+      font-size: clamp(2.5rem, 6vw, 3.75rem);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      margin: 0 0 20px;
+      max-width: 720px;
+      line-height: 1.1;
+      animation: heroFade 0.8s ease-out;
+    }
+    .hero h1 span { color: var(--accent); }
+    .hero .tagline {
+      font-size: clamp(1.05rem, 2vw, 1.25rem);
+      color: var(--text-muted);
+      max-width: 540px;
+      margin: 0 0 36px;
+      line-height: 1.5;
+      animation: heroFade 0.8s ease-out 0.15s both;
+    }
+    .hero .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: center;
+      animation: heroFade 0.8s ease-out 0.3s both;
+    }
+    .hero .btn-outline {
+      box-shadow: 0 0 32px var(--accent-glow);
+    }
+    .hero .trust {
+      margin-top: 28px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      opacity: 0.9;
+    }
+    .hero .trust strong { color: var(--text); font-weight: 600; }
+    @keyframes heroFade {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
 
-  <title>marine_safe_app_fixed</title>
-  <link rel="manifest" href="manifest.json">
+    /* Features strip */
+    .features-strip {
+      padding: 64px 24px;
+      background: var(--bg-elevated);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .features-strip .wrap {
+      max-width: 1000px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 40px;
+      text-align: center;
+    }
+    .features-strip .item {
+      padding: 24px 16px;
+      border-radius: 20px;
+      transition: background 0.25s ease, transform 0.25s ease;
+    }
+    .features-strip .item:hover {
+      background: rgba(255, 255, 255, 0.03);
+      transform: translateY(-2px);
+    }
+    .features-strip .icon {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 16px;
+      background: var(--accent-soft);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      color: var(--accent);
+      border: 1px solid rgba(44, 182, 255, 0.2);
+    }
+    .features-strip .item h3 {
+      margin: 0 0 8px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .features-strip .item p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* How it works */
+    .how-section {
+      padding: 64px 24px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+    .how-section h2 {
+      font-size: clamp(1.5rem, 3.5vw, 2rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      text-align: center;
+      margin: 0 0 40px;
+    }
+    .how-steps {
+      max-width: 720px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      text-align: center;
+    }
+    .how-steps .step {
+      padding: 24px 16px;
+    }
+    .how-steps .num {
+      width: 40px;
+      height: 40px;
+      margin: 0 auto 16px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(44, 182, 255, 0.3);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.1rem;
+      color: var(--accent);
+    }
+    .how-steps .step h3 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+    .how-steps .step p {
+      margin: 0;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .escalation-section {
+      padding: 64px 24px;
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+    }
+    .escalation-section h2 {
+      font-size: clamp(1.35rem, 3vw, 1.75rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin: 0 0 12px;
+    }
+    .escalation-section .lead {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      max-width: 560px;
+      margin: 0 auto 24px;
+      line-height: 1.5;
+    }
+    .escalation-section .points {
+      max-width: 480px;
+      margin: 0 auto;
+      text-align: left;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .escalation-section .points li {
+      margin-bottom: 8px;
+      padding-left: 8px;
+    }
+    .escalation-section .points strong { color: var(--accent); }
+    @media (max-width: 640px) {
+      .how-steps { grid-template-columns: 1fr; gap: 20px; }
+      .how-section { padding: 48px 16px; }
+    }
+
+    /* Simulator section — full viewport, no scrolling */
+    .simulator-section {
+      min-height: 100vh;
+      height: 100vh;
+      padding: 0;
+      margin: 0;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .simulator-section h2 {
+      font-size: clamp(1.35rem, 3vw, 1.65rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin: 0;
+      padding: 20px 24px 8px;
+      flex-shrink: 0;
+    }
+    .simulator-section .sub {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      max-width: 480px;
+      margin: 0 auto 8px;
+      padding: 0 24px;
+      flex-shrink: 0;
+    }
+    .simulator-wrap {
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      overflow: hidden;
+    }
+    .simulator-wrap iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      border: none;
+    }
+    /* Footer */
+    .footer {
+      padding: 40px 24px;
+      padding-bottom: max(40px, calc(24px + env(safe-area-inset-bottom)));
+      border-top: 1px solid var(--border);
+      text-align: center;
+      background: var(--bg);
+    }
+    .footer .logo {
+      font-size: 1.15rem;
+      margin-bottom: 10px;
+      display: inline-block;
+    }
+    .footer p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+    .footer a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    @media (max-width: 640px) {
+      .nav .hide-mobile { display: none; }
+      .nav { gap: 16px; }
+      .header { padding-left: 16px; padding-right: 16px; }
+      .hero { padding: 80px 16px 48px; padding-top: max(88px, calc(72px + env(safe-area-inset-top))); }
+      .hero h1 { font-size: 1.75rem; }
+      .hero .tagline { font-size: 0.95rem; }
+      .features-strip { padding: 48px 16px; }
+      .features-strip .wrap { gap: 28px; }
+      .features-strip .item { padding: 20px 12px; }
+      .simulator-section h2 { padding: 12px 16px 6px; font-size: 1.2rem; }
+      .simulator-section .sub { padding: 0 16px; font-size: 0.85rem; }
+      .footer { padding: 24px 16px; padding-bottom: max(32px, calc(24px + env(safe-area-inset-bottom))); }
+    }
+  </style>
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+  <header class="header">
+    <a href="#" class="logo">Marine <span>Safe</span> App</a>
+    <nav class="nav">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#try" class="hide-mobile">Try demo</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>Stay accountable on the water</h1>
+    <p class="tagline">Set your launch ramp and return time. If you don’t check in, Marine Safe escalates from reminders to alerting your emergency contact—with your last location and a map link—so someone can act. It <strong>complements</strong> 000 and VHF Ch 16; it doesn’t replace them.</p>
+    <div class="cta-row">
+      <a href="#try" class="btn btn-outline">Try the demo</a>
+    </div>
+    <p class="trust">Built for Australian boaters. Ramps across Australia; favourites and “Near me” by GPS.</p>
+  </section>
+
+  <section id="how" class="how-section">
+    <h2>How it works</h2>
+    <div class="how-steps">
+      <div class="step">
+        <div class="num">1</div>
+        <h3>Set ramp & return time</h3>
+        <p>Pick your launch ramp from the Australian list (by postcode or GPS) and set when you plan to be back.</p>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <h3>Start your trip</h3>
+        <p>Tap Start trip at the ramp. We run in the background so reminders and escalation still work if the app is closed.</p>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <h3>Check in or we escalate</h3>
+        <p>If you don’t check in, we nudge you, then prompt you to text your emergency contact with vessel, ramp, ETA and last known location. We then suggest contacting Marine Rescue if needed.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="features" class="features-strip">
+    <div class="wrap">
+      <div class="item">
+        <div class="icon"><span class="material-icons-round">directions_boat</span></div>
+        <h3>Trip tracking</h3>
+        <p>Pick your launch ramp from Australian ramps (by postcode or “Near me” GPS), set your return ETA, then start and end trips at the ramp.</p>
+      </div>
+      <div class="item">
+        <div class="icon"><span class="material-icons-round">schedule</span></div>
+        <h3>Return ETA</h3>
+        <p>Set when you plan to return. We remind you at ETA, then if you don’t check in we prompt you to text your contact—with vessel, ramp, ETA and last known location.</p>
+      </div>
+      <div class="item">
+        <div class="icon"><span class="material-icons-round">anchor</span></div>
+        <h3>Boat &amp; gear</h3>
+        <p>Boat details, rego and expiry; safety equipment (PFDs, EPIRB, flares, extinguisher). We check compliance before you start a trip.</p>
+      </div>
+      <div class="item">
+        <div class="icon"><span class="material-icons-round">contact_emergency</span></div>
+        <h3>Emergency contacts</h3>
+        <p>Primary and optional second contact. If you’re overdue, we open your SMS app with a prefilled message (vessel, ramp, ETA, last location, map link)—you tap Send.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="escalation" class="escalation-section">
+    <h2>If you don’t check in</h2>
+    <p class="lead">We escalate so your contact has what they need—and so you stay accountable.</p>
+    <ul class="points">
+      <li><strong>At ETA</strong> — Due reminder to you.</li>
+      <li><strong>+5 min</strong> — Overdue notification to you.</li>
+      <li><strong>+10 min</strong> — We prompt you to send an overdue alert to your primary contact (SMS with vessel, ramp, ETA, last known location, map link).</li>
+      <li><strong>+20 min</strong> — Same for all contacts.</li>
+      <li><strong>+30 min</strong> — We suggest considering Marine Rescue / 000.</li>
+    </ul>
+  </section>
+
+  <section id="try" class="simulator-section">
+    <h2>See the app in action</h2>
+    <p class="sub">Click through the demo below to explore Marine Safe App. Use Next and Back to try each screen.</p>
+    <div class="simulator-wrap">
+      <iframe src="simulator.html" title="Marine Safe App demo"></iframe>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <a href="#" class="logo">Marine <span>Safe</span> App</a>
+    <p>Stay safe on the water. &copy; Marine Safe App</p>
+  </footer>
 </body>
 </html>

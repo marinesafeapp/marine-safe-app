@@ -458,14 +458,44 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
 
     final statusColor = r.overdue ? Colors.redAccent : Colors.greenAccent;
 
-    // Extract last known location for overdue trips
+    // Last known location: priority lastLat/lastLng → lastLocation → launchRamp (same as SMS escalation)
+    final lastLat = (d['lastLat'] as num?)?.toDouble();
+    final lastLng = (d['lastLng'] as num?)?.toDouble();
     final lastLocation = d['lastLocation'] as Map<String, dynamic>?;
-    final hasLocation = lastLocation != null && 
-                       lastLocation['lat'] != null && 
-                       lastLocation['lng'] != null;
-    final lastLocationTime = hasLocation && lastLocation['timestamp'] != null
-        ? _parseIso(lastLocation['timestamp'])
-        : null;
+    final launchRampLat = (d['launchRampLat'] as num?)?.toDouble();
+    final launchRampLng = (d['launchRampLng'] as num?)?.toDouble();
+    final launchRampName = d['launchRampName'] as String?;
+    final bool hasLocation;
+    final double? displayLat;
+    final double? displayLng;
+    final DateTime? lastLocationTime;
+    final bool isRampFallback;
+    if (lastLat != null && lastLng != null) {
+      hasLocation = true;
+      displayLat = lastLat;
+      displayLng = lastLng;
+      final ts = d['lastLocationTimestamp'];
+      lastLocationTime = ts != null ? _parseIso(ts) : null;
+      isRampFallback = false;
+    } else if (lastLocation != null && lastLocation['lat'] != null && lastLocation['lng'] != null) {
+      hasLocation = true;
+      displayLat = (lastLocation['lat'] as num).toDouble();
+      displayLng = (lastLocation['lng'] as num).toDouble();
+      lastLocationTime = lastLocation['timestamp'] != null ? _parseIso(lastLocation['timestamp']) : null;
+      isRampFallback = false;
+    } else if (launchRampLat != null && launchRampLng != null) {
+      hasLocation = true;
+      displayLat = launchRampLat;
+      displayLng = launchRampLng;
+      lastLocationTime = null;
+      isRampFallback = true;
+    } else {
+      hasLocation = false;
+      displayLat = null;
+      displayLng = null;
+      lastLocationTime = null;
+      isRampFallback = false;
+    }
 
     return InkWell(
       borderRadius: BorderRadius.circular(18),
@@ -575,7 +605,9 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
                         Expanded(
                           child: Text(
                             hasLocation
-                                ? "Last location: ${lastLocation['lat'].toStringAsFixed(4)}, ${lastLocation['lng'].toStringAsFixed(4)}"
+                                ? (isRampFallback && (launchRampName ?? '').isNotEmpty
+                                    ? "Fallback: $launchRampName"
+                                    : "Last location: ${displayLat!.toStringAsFixed(4)}, ${displayLng!.toStringAsFixed(4)}")
                                 : "No location available",
                             style: TextStyle(
                               color: hasLocation ? Colors.orangeAccent : Colors.white54,

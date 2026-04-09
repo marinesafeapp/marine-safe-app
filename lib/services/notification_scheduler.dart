@@ -40,9 +40,9 @@ class NotificationScheduler {
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestSoundPermission: true,
-      requestBadgePermission: true,
+      requestAlertPermission: false,
+      requestSoundPermission: false,
+      requestBadgePermission: false,
     );
     const settings = InitializationSettings(android: androidInit, iOS: iosInit);
     await _plugin.initialize(settings);
@@ -50,7 +50,6 @@ class NotificationScheduler {
     try {
       final android = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
-      await android?.requestNotificationsPermission();
       try {
         await android?.requestExactAlarmsPermission();
       } catch (_) {}

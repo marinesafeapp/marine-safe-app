@@ -91,16 +91,18 @@ class _PrepareScreenState extends State<PrepareScreen> {
               showProBadge: false,
             ),
           ],
-          const SizedBox(height: 12),
-          _linkCard(
-            context,
-            icon: Icons.workspace_premium_rounded,
-            title: _isPro ? "Subscription" : "Marine Safe Pro",
-            subtitle: _isPro ? "Manage your plan" : "Unlock trip history, multiple vessels, invite crew",
-            onTap: () => _push(context, const ProScreen()),
-            variantBackground: !_isPro,
-            showProBadge: !_isPro,
-          ),
+          if (!_isPro) ...[
+            const SizedBox(height: 12),
+            _linkCard(
+              context,
+              icon: Icons.workspace_premium_rounded,
+              title: "Marine Safe Pro",
+              subtitle: "Unlock trip history, multiple vessels, invite crew",
+              onTap: () => _push(context, const ProScreen()),
+              variantBackground: true,
+              showProBadge: true,
+            ),
+          ],
           const SizedBox(height: 12),
           _linkCard(
             context,

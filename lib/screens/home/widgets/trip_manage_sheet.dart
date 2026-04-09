@@ -6,7 +6,9 @@ class TripManageSheet extends StatelessWidget {
   final String rampName;
   final DateTime eta;
   final int personsOnBoard;
+  final double? fuelAddedLitres;
   final VoidCallback onEditPeople;
+  final VoidCallback onEditFuel;
 
   final VoidCallback onExtend30m;
   final VoidCallback onExtend1h;
@@ -24,7 +26,9 @@ class TripManageSheet extends StatelessWidget {
     required this.rampName,
     required this.eta,
     required this.personsOnBoard,
+    required this.fuelAddedLitres,
     required this.onEditPeople,
+    required this.onEditFuel,
     required this.onExtend30m,
     required this.onExtend1h,
     required this.showAcknowledge,
@@ -32,6 +36,13 @@ class TripManageSheet extends StatelessWidget {
     required this.onEndTrip,
     this.onInviteCrew,
   });
+
+  String _fmtFuel(double? litres) {
+    if (litres == null) return 'Not set';
+    final v = litres;
+    if ((v - v.roundToDouble()).abs() < 0.000001) return '${v.round()}';
+    return v.toStringAsFixed(1);
+  }
 
   String _fmt(DateTime dt) {
     String two(int x) => x.toString().padLeft(2, '0');
@@ -118,6 +129,45 @@ class TripManageSheet extends StatelessWidget {
                   ),
                 ),
               ),
+                const SizedBox(height: 16),
+                // Fuel added — simple trip-specific record (Pro-ready, but shown for all)
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: onEditFuel,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.local_gas_station_rounded, size: 20, color: Colors.white70),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    'Fuel added: ${_fmtFuel(fuelAddedLitres)} L',
+                                    style: const TextStyle(fontSize: 14, color: Colors.white70),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Change',
+                            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 16),
 
                 // Extend buttons

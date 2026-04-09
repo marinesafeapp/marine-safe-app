@@ -30,6 +30,16 @@ type TripDoc = {
   allSmsTargetPhones?: string[] | null;
   allSmsSidsByPhone?: Record<string, string> | null;
   emergencyContacts?: Array<{ name: string; phoneE164: string; isPrimary: boolean }>;
+  // Single source of truth: flat last-known location (preferred over lastLocation)
+  lastLat?: number | null;
+  lastLng?: number | null;
+  lastLocationTimestamp?: admin.firestore.Timestamp | null;
+  lastLocationSource?: string | null;
+  // Launch ramp fallback when GPS unavailable
+  launchRampName?: string | null;
+  launchRampLat?: number | null;
+  launchRampLng?: number | null;
+  // Legacy nested object (fallback if flat fields missing)
   lastLocation?: {
     lat?: number;
     lng?: number;
@@ -58,16 +68,68 @@ function mapLink(lat: number | undefined, lng: number | undefined): string {
   return `https://maps.google.com/?q=${lat},${lng}`;
 }
 
-function buildPrimarySms(d: TripDoc, etaLocalStr: string, lastSeenStr: string, link: string): string {
+/** Priority A: lastLat/lastLng. B: launchRampLat/launchRampLng. C: unavailable. */
+function resolveLocationForAlert(d: TripDoc): {
+  lat: number | undefined;
+  lng: number | undefined;
+  lastSeenStr: string;
+  isFallback: boolean;
+  fallbackLabel: string;
+} {
+  // Priority A: flat last-known location
+  if (d.lastLat != null && d.lastLng != null) {
+    const ts = d.lastLocationTimestamp;
+    return {
+      lat: d.lastLat,
+      lng: d.lastLng,
+      lastSeenStr: lastSeenLocal(ts ?? undefined),
+      isFallback: false,
+      fallbackLabel: "",
+    };
+  }
+  // Legacy: nested lastLocation
+  const loc = d.lastLocation;
+  if (loc?.lat != null && loc?.lng != null) {
+    const ts = loc.timestampUtc ?? loc.timestamp;
+    return {
+      lat: loc.lat,
+      lng: loc.lng,
+      lastSeenStr: lastSeenLocal(ts),
+      isFallback: false,
+      fallbackLabel: "",
+    };
+  }
+  // Priority B: launch ramp fallback
+  if (d.launchRampLat != null && d.launchRampLng != null) {
+    const name = (d.launchRampName ?? "Launch ramp").trim() || "Launch ramp";
+    return {
+      lat: d.launchRampLat,
+      lng: d.launchRampLng,
+      lastSeenStr: "—",
+      isFallback: true,
+      fallbackLabel: `Fallback location: ${name}`,
+    };
+  }
+  // Priority C: unavailable
+  return {
+    lat: undefined,
+    lng: undefined,
+    lastSeenStr: "—",
+    isFallback: false,
+    fallbackLabel: "",
+  };
+}
+
+function buildPrimarySms(d: TripDoc, etaLocalStr: string, resolved: ReturnType<typeof resolveLocationForAlert>): string {
   const skipperName = (d.name ?? "the skipper").trim() || "the skipper";
   const rampName = (d.rampName ?? "(ramp not set)").trim() || "(ramp not set)";
   const pob = d.personsOnBoard != null ? String(d.personsOnBoard) : "(unknown)";
-  const loc = d.lastLocation;
-  const lat = loc?.lat;
-  const lng = loc?.lng;
+  const link = mapLink(resolved.lat, resolved.lng);
   const lastLine =
-    lat != null && lng != null
-      ? `Last known: ${lat},${lng} at ${lastSeenStr}\nMap: ${link}`
+    resolved.lat != null && resolved.lng != null
+      ? resolved.isFallback
+        ? `${resolved.fallbackLabel}\nMap: ${link}`
+        : `Last known location: ${resolved.lat},${resolved.lng} at ${resolved.lastSeenStr}\nMap: ${link}`
       : "Last known location unavailable.";
   return (
     `Marine Safe ALERT: No check-in from ${skipperName} for 30 min after ETA.\n` +
@@ -78,14 +140,14 @@ function buildPrimarySms(d: TripDoc, etaLocalStr: string, lastSeenStr: string, l
   );
 }
 
-function buildAllContactsSms(d: TripDoc, etaLocalStr: string, lastSeenStr: string, link: string): string {
+function buildAllContactsSms(d: TripDoc, etaLocalStr: string, resolved: ReturnType<typeof resolveLocationForAlert>): string {
   const skipperName = (d.name ?? "the skipper").trim() || "the skipper";
-  const loc = d.lastLocation;
-  const lat = loc?.lat;
-  const lng = loc?.lng;
+  const link = mapLink(resolved.lat, resolved.lng);
   const lastLine =
-    lat != null && lng != null
-      ? `Last known: ${lat},${lng} at ${lastSeenStr}\nMap: ${link}`
+    resolved.lat != null && resolved.lng != null
+      ? resolved.isFallback
+        ? `${resolved.fallbackLabel}\nMap: ${link}`
+        : `Last known location: ${resolved.lat},${resolved.lng} at ${resolved.lastSeenStr}\nMap: ${link}`
       : "Last known location unavailable.";
   return (
     `Marine Safe ALERT (Escalated): Still no reply from ${skipperName}.\n` +
@@ -133,11 +195,8 @@ export const escalateOverdueTrips = onSchedule(
 
       const contacts = d.emergencyContacts ?? [];
       const primary = contacts.find((c) => c.isPrimary) ?? contacts[0];
-      const loc = d.lastLocation;
-      const ts = loc?.timestampUtc ?? loc?.timestamp;
       const etaLocalStr = etaLocal(d.etaUtc!);
-      const lastSeenStr = lastSeenLocal(ts);
-      const link = mapLink(loc?.lat, loc?.lng);
+      const resolved = resolveLocationForAlert(d);
 
       // ETA + 30: primary only (lease + mark-sent-on-success)
       if (eta <= thirtyMinutesAgo && d.primarySmsSentAtUtc == null) {
@@ -165,7 +224,7 @@ export const escalateOverdueTrips = onSchedule(
           claimed = true;
         });
         if (claimed) {
-          const body = buildPrimarySms(d, etaLocalStr, lastSeenStr, link);
+          const body = buildPrimarySms(d, etaLocalStr, resolved);
           const result = await sendSms(to, body);
           if (result.ok) {
             await doc.ref.update({
@@ -222,7 +281,7 @@ export const escalateOverdueTrips = onSchedule(
           claimed = true;
         });
         if (claimed && targetPhones.length > 0) {
-          const bodyAll = buildAllContactsSms(d, etaLocalStr, lastSeenStr, link);
+          const bodyAll = buildAllContactsSms(d, etaLocalStr, resolved);
           let sentThisRun = 0;
           let failedThisRun = 0;
           for (const toRaw of targetPhones) {

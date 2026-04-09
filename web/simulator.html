@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Marine Safe App — Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #02050a;
+      --bg-card: #030508;
+      --accent: #2cb6ff;
+      --accent-dim: rgba(44, 182, 255, 0.12);
+      --text: #ffffff;
+      --text-muted: rgba(255, 255, 255, 0.7);
+      --border: rgba(255, 255, 255, 0.12);
+      --phone-width: 320px;
+      --phone-height: 692px;
+      --radius: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      height: 100dvh;
+      max-height: 100vh;
+      background: var(--bg);
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 16px;
+      padding-top: max(12px, env(safe-area-inset-top));
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      overflow: hidden;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .page-header {
+      text-align: center;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+    .page-header h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin: 0 0 2px 0;
+      letter-spacing: -0.02em;
+    }
+    .page-header p {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      margin: 0;
+    }
+
+    /* Phone frame — scale to fit viewport */
+    .simulator-scale {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+    .phone-wrap {
+      position: relative;
+      width: 320px;
+      height: 692px;
+      flex-shrink: 0;
+      transform: scale(var(--sim-scale, 0.9));
+      transform-origin: center center;
+    }
+
+    .phone-frame {
+      width: 100%;
+      height: 100%;
+      background: #0d0d0f;
+      border-radius: 44px;
+      padding: 12px;
+      box-shadow:
+        0 0 0 3px #1a1a1e,
+        0 0 0 6px #2a2a2e,
+        0 32px 64px rgba(0, 0, 0, 0.5),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+      position: relative;
+    }
+
+    .phone-frame::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 28px;
+      background: #0d0d0f;
+      border-radius: 0 0 20px 20px;
+      z-index: 10;
+    }
+
+    .phone-screen {
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      border-radius: 32px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Boat watermark — same as app: soft blend at bottom (hidden on splash) */
+    .boat-watermark {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0.06;
+      background-image: url('assets/images/boat.png');
+      background-repeat: no-repeat;
+      background-position: -15% 110%;
+      background-size: 75%;
+      mask-image: linear-gradient(to bottom, transparent 0%, white 50%, white 100%);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, white 50%, white 100%);
+      mask-size: 100% 100%;
+      -webkit-mask-size: 100% 100%;
+      transform: scaleX(-1);
+    }
+    .phone-screen.splash-visible .boat-watermark {
+      display: none;
+    }
+
+    /* Beta banner — angled across top corner on every page */
+    .beta-banner {
+      position: absolute;
+      top: 0;
+      right: 0;
+      z-index: 20;
+      pointer-events: none;
+      padding: 10px 28px;
+      text-align: center;
+      line-height: 1.2;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      color: #fff;
+      background: #c62828;
+      box-shadow: 0 2px 8px rgba(198, 40, 40, 0.45);
+      transform: translate(22px, 18px) rotate(45deg);
+    }
+
+    .demo-view {
+      display: none;
+      width: 100%;
+      height: 100%;
+      flex-direction: column;
+      padding: 0;
+      overflow: hidden;
+    }
+    .demo-view.active {
+      display: flex;
+    }
+    .demo-view {
+      position: relative;
+      z-index: 5;
+    }
+
+    /* Splash */
+    .demo-splash {
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+    .demo-splash .logo-text {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #fff;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .demo-splash .logo-text .logo-accent {
+      color: var(--accent);
+    }
+    .page-header .logo-accent {
+      color: var(--accent);
+    }
+    .demo-splash .tagline {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+    .demo-splash .splash-logo {
+      margin-top: 32px;
+      width: 120px;
+      height: 120px;
+      object-fit: contain;
+    }
+
+    /* Main shell (Trip tab) */
+    .demo-main .app-bar {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 800;
+      font-size: 1.1rem;
+    }
+    .demo-main .scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+    .status-strip {
+      background: var(--accent-dim);
+      border: 1px solid rgba(44, 182, 255, 0.2);
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .status-strip .icon {
+      color: var(--accent);
+      font-size: 22px;
+    }
+    .status-strip .label {
+      font-weight: 800;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .strip-card {
+      background: var(--accent-dim);
+      border: 1px solid rgba(44, 182, 255, 0.2);
+      border-radius: 14px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .strip-card .icon {
+      color: var(--accent);
+      font-size: 22px;
+    }
+    .strip-card .content {
+      flex: 1;
+    }
+    .strip-card .content .title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .strip-card .content .value {
+      font-weight: 800;
+      font-size: 14px;
+    }
+    .strip-card .chevron {
+      color: var(--text-muted);
+      font-size: 22px;
+    }
+    .btn-start-trip {
+      width: 100%;
+      margin-top: 16px;
+      padding: 16px 24px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 20px;
+      font-family: inherit;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(44, 182, 255, 0.35);
+    }
+    .btn-start-trip .material-icons-round {
+      font-size: 26px;
+    }
+    .nav-bar {
+      display: flex;
+      justify-content: space-around;
+      padding: 10px 8px 12px;
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .nav-item .material-icons-round {
+      font-size: 24px;
+    }
+    .nav-item.active {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    /* Gear screen */
+    .demo-gear .app-bar {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 800;
+      font-size: 1.1rem;
+    }
+    .demo-gear .scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+    .gear-desc {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+      line-height: 1.45;
+    }
+    .gear-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .gear-card .icon-wrap {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: var(--accent-dim);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+    }
+    .gear-card .material-icons-round {
+      font-size: 24px;
+    }
+    .gear-card .content h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .gear-card .content p {
+      margin: 4px 0 0 0;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Trip active screen */
+    .demo-trip-active .strip-card.warning {
+      border-color: rgba(255, 82, 82, 0.4);
+      background: rgba(255, 82, 82, 0.08);
+    }
+    .demo-trip-active .strip-card.warning .icon {
+      color: #ff5252;
+    }
+    .btn-end-trip {
+      width: 100%;
+      margin-top: 16px;
+      padding: 16px 24px;
+      background: #ff5252;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      font-family: inherit;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(255, 82, 82, 0.35);
+    }
+
+    /* Controls below phone */
+    .controls {
+      margin-top: 12px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .controls button {
+      min-width: 120px;
+      min-height: 44px;
+      padding: 12px 24px;
+      touch-action: manipulation;
+      border-radius: 14px;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      border: none;
+      transition: transform 0.15s, opacity 0.15s;
+    }
+    .controls button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .controls button:not(:disabled):hover {
+      transform: scale(1.03);
+    }
+    .controls button:not(:disabled):active {
+      transform: scale(0.98);
+    }
+    .btn-back {
+      background: var(--bg-card);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-next {
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 4px 16px rgba(44, 182, 255, 0.3);
+    }
+    .step-indicator {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    /* Profile */
+    .demo-profile .app-bar { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); font-weight: 800; font-size: 1.1rem; }
+    .demo-profile .scroll-area { flex: 1; overflow-y: auto; padding: 16px; }
+    .profile-field { margin-bottom: 12px; }
+    .profile-field label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; }
+    .profile-field .value { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 14px; color: var(--text); }
+    .profile-section { font-size: 12px; font-weight: 700; color: var(--accent); margin: 16px 0 8px 0; }
+    .demo-profile .nav-bar { margin-top: auto; }
+
+    /* Boat details */
+    .demo-boat .app-bar { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); font-weight: 800; }
+    .demo-boat .scroll-area { flex: 1; overflow-y: auto; padding: 16px; }
+    .vessel-photo {
+      width: 100%;
+      aspect-ratio: 16 / 10;
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+    }
+    .vessel-photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .boat-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .boat-row .l { color: var(--text-muted); }
+    .boat-row .r { font-weight: 700; }
+    .demo-boat .expiry-ok { color: #4caf50; }
+    .demo-boat .expiry-soon { color: #ff9800; }
+
+    /* Emergency contacts */
+    .demo-emergency .app-bar { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); font-weight: 800; font-size: 0.95rem; }
+    .demo-emergency .scroll-area { flex: 1; overflow-y: auto; padding: 16px; }
+    .emergency-contact { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px; margin-bottom: 8px; }
+    .emergency-contact .name { font-weight: 800; font-size: 14px; }
+    .emergency-contact .phone { font-size: 12px; color: var(--accent); }
+    .emergency-contact .relation { font-size: 11px; color: var(--text-muted); }
+
+  </style>
+</head>
+<body>
+  <div class="page-header">
+    <h1>Marine <span class="logo-accent">Safe</span> App</h1>
+    <p>Tap through the demo to see how the app works</p>
+  </div>
+
+  <div class="simulator-scale">
+  <div class="phone-wrap">
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="boat-watermark" aria-hidden="true"></div>
+        <div class="beta-banner" aria-hidden="true">BETA</div>
+        <!-- 1: Splash -->
+        <div id="view-0" class="demo-view demo-splash active">
+          <div class="logo-text">Marine <span class="logo-accent">Safe</span></div>
+          <div class="tagline">Stay safe on the water</div>
+          <img src="assets/branding/marine_safe_logo_icon.png" alt="Marine Safe" class="splash-logo" />
+        </div>
+
+        <!-- 2: Trip (Ready) -->
+        <div id="view-1" class="demo-view demo-main">
+          <div class="app-bar">Trip</div>
+          <div class="scroll-area">
+            <div class="status-strip">
+              <span class="material-icons-round icon">directions_boat</span>
+              <span class="label">Ready to go</span>
+            </div>
+            <div class="strip-card">
+              <span class="material-icons-round icon">anchor</span>
+              <div class="content">
+                <div class="title">Ramp</div>
+                <div class="value">Port of Hastings</div>
+              </div>
+              <span class="material-icons-round chevron">chevron_right</span>
+            </div>
+            <div class="strip-card">
+              <span class="material-icons-round icon">directions_boat</span>
+              <div class="content">
+                <div class="title">Vessel</div>
+                <div class="value">Select vessel</div>
+              </div>
+              <span class="material-icons-round chevron">chevron_right</span>
+            </div>
+            <button type="button" class="btn-start-trip" aria-label="Start trip">
+              <span class="material-icons-round">play_circle</span>
+              START TRIP
+            </button>
+          </div>
+          <div class="nav-bar">
+            <div class="nav-item"><span class="material-icons-round">checklist</span> Gear</div>
+            <div class="nav-item"><span class="material-icons-round">cloud</span> Forecast</div>
+            <div class="nav-item active"><span class="material-icons-round">directions_boat</span> Trip</div>
+            <div class="nav-item"><span class="material-icons-round">person</span> Profile</div>
+            <div class="nav-item"><span class="material-icons-round">business</span> Sponsors</div>
+          </div>
+        </div>
+
+        <!-- 3: Trip active (on the water) -->
+        <div id="view-2" class="demo-view demo-main demo-trip-active">
+          <div class="app-bar">Trip</div>
+          <div class="scroll-area">
+            <div class="status-strip">
+              <span class="material-icons-round icon">waves</span>
+              <span class="label">Trip in progress</span>
+            </div>
+            <div class="strip-card warning">
+              <span class="material-icons-round icon">waves</span>
+              <div class="content">
+                <div class="title">Trip</div>
+                <div class="value">On the water · 1h 45m left</div>
+                <div class="title">Port of Hastings</div>
+              </div>
+              <span class="material-icons-round chevron">chevron_right</span>
+            </div>
+            <button type="button" class="btn-end-trip" aria-label="End trip">
+              <span class="material-icons-round">stop_circle</span>
+              END TRIP
+            </button>
+          </div>
+          <div class="nav-bar">
+            <div class="nav-item"><span class="material-icons-round">checklist</span> Gear</div>
+            <div class="nav-item"><span class="material-icons-round">cloud</span> Forecast</div>
+            <div class="nav-item active"><span class="material-icons-round">directions_boat</span> Trip</div>
+            <div class="nav-item"><span class="material-icons-round">person</span> Profile</div>
+            <div class="nav-item"><span class="material-icons-round">business</span> Sponsors</div>
+          </div>
+        </div>
+
+        <!-- 4: Gear -->
+        <div id="view-3" class="demo-view demo-gear">
+          <div class="app-bar">Gear</div>
+          <div class="scroll-area">
+            <p class="gear-desc">Boat details, safety equipment, and trip history (Pro).</p>
+            <div class="gear-card">
+              <div class="icon-wrap"><span class="material-icons-round">directions_boat</span></div>
+              <div class="content">
+                <h3>Boat details</h3>
+                <p>Registration, EPIRB, flares, extinguisher</p>
+              </div>
+            </div>
+            <div class="gear-card">
+              <div class="icon-wrap"><span class="material-icons-round">health_and_safety</span></div>
+              <div class="content">
+                <h3>Safety equipment</h3>
+                <p>PFDs and safety gear</p>
+              </div>
+            </div>
+            <div class="gear-card">
+              <div class="icon-wrap"><span class="material-icons-round">workspace_premium</span></div>
+              <div class="content">
+                <h3>Marine Safe Pro</h3>
+                <p>Unlock trip history, multiple vessels, invite crew</p>
+              </div>
+            </div>
+          </div>
+          <div class="nav-bar">
+            <div class="nav-item active"><span class="material-icons-round">checklist</span> Gear</div>
+            <div class="nav-item"><span class="material-icons-round">cloud</span> Forecast</div>
+            <div class="nav-item"><span class="material-icons-round">directions_boat</span> Trip</div>
+            <div class="nav-item"><span class="material-icons-round">person</span> Profile</div>
+            <div class="nav-item"><span class="material-icons-round">business</span> Sponsors</div>
+          </div>
+        </div>
+
+        <!-- 5: Profile -->
+        <div id="view-5" class="demo-view demo-profile">
+          <div class="app-bar">Profile</div>
+          <div class="scroll-area">
+            <div class="profile-section">Personal</div>
+            <div class="profile-field"><label>Name</label><div class="value">Alex Smith</div></div>
+            <div class="profile-field"><label>Phone</label><div class="value">0412 345 678</div></div>
+            <div class="profile-field"><label>Postcode</label><div class="value">4178</div></div>
+            <div class="profile-section">Emergency contact 1</div>
+            <div class="profile-field"><label>Name</label><div class="value">Jane Smith</div></div>
+            <div class="profile-field"><label>Phone</label><div class="value">0400 111 222</div></div>
+            <div class="profile-field"><label>Relation</label><div class="value">Partner</div></div>
+          </div>
+          <div class="nav-bar">
+            <div class="nav-item"><span class="material-icons-round">checklist</span> Gear</div>
+            <div class="nav-item"><span class="material-icons-round">cloud</span> Forecast</div>
+            <div class="nav-item"><span class="material-icons-round">directions_boat</span> Trip</div>
+            <div class="nav-item active"><span class="material-icons-round">person</span> Profile</div>
+            <div class="nav-item"><span class="material-icons-round">business</span> Sponsors</div>
+          </div>
+        </div>
+
+        <!-- 6: Boat details -->
+        <div id="view-7" class="demo-view demo-boat">
+          <div class="app-bar">Boat details</div>
+          <div class="scroll-area">
+            <div class="vessel-photo">
+              <img src="https://images.unsplash.com/photo-1735508627169-09267551339a?w=400&q=80" alt="Vessel" />
+            </div>
+            <div class="boat-row"><span class="l">Boat name</span><span class="r">Tinny 4.2</span></div>
+            <div class="boat-row"><span class="l">Boat rego</span><span class="r">QLD 12345</span></div>
+            <div class="boat-row"><span class="l">Trailer rego</span><span class="r">ABC 2XY</span></div>
+            <div class="boat-row"><span class="l">Boat rego expiry</span><span class="r expiry-ok">Dec 2026</span></div>
+            <div class="boat-row"><span class="l">EPIRB expiry</span><span class="r expiry-soon">Apr 2026</span></div>
+            <div class="boat-row"><span class="l">Flares expiry</span><span class="r expiry-soon">Jun 2026</span></div>
+            <div class="boat-row" style="border-bottom: none;"><span class="l">Extinguisher</span><span class="r expiry-ok">Present</span></div>
+          </div>
+        </div>
+
+        <!-- 7: Emergency contacts -->
+        <div id="view-12" class="demo-view demo-emergency">
+          <div class="app-bar">Emergency contacts</div>
+          <div class="scroll-area">
+            <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 12px;">Used if you're overdue or need help</p>
+            <div class="emergency-contact">
+              <div class="name">Jane Smith</div>
+              <div class="phone">0400 111 222</div>
+              <div class="relation">Partner</div>
+            </div>
+            <div class="emergency-contact">
+              <div class="name">Marine Rescue</div>
+              <div class="phone">000 or VHF 16</div>
+              <div class="relation">Emergency</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <div class="controls">
+    <button type="button" class="btn-back" id="btn-back" disabled>Back</button>
+    <span class="step-indicator" id="step-indicator">1 of 7</span>
+    <button type="button" class="btn-next" id="btn-next">Next</button>
+  </div>
+
+  <script>
+    const views = document.querySelectorAll('.demo-view');
+    const total = views.length;
+    let current = 0;
+
+    function showView(index) {
+      current = index;
+      views.forEach((v, i) => v.classList.toggle('active', i === index));
+
+      const phoneScreen = document.querySelector('.phone-screen');
+      if (phoneScreen) {
+        phoneScreen.classList.toggle('splash-visible', index === 0);
+      }
+
+      const backBtn = document.getElementById('btn-back');
+      const nextBtn = document.getElementById('btn-next');
+      const stepEl = document.getElementById('step-indicator');
+
+      backBtn.disabled = index <= 0;
+      nextBtn.textContent = index >= total - 1 ? 'Restart' : 'Next';
+      stepEl.textContent = `${index + 1} of ${total}`;
+    }
+
+    document.getElementById('btn-back').addEventListener('click', () => {
+      if (current > 0) showView(current - 1);
+    });
+
+    document.getElementById('btn-next').addEventListener('click', () => {
+      if (current < total - 1) {
+        showView(current + 1);
+      } else {
+        showView(0);
+      }
+    });
+
+    showView(0);
+
+    // Scale simulator to fit viewport with no scroll
+    function fitSimulator() {
+      var h = window.innerHeight;
+      var header = document.querySelector('.page-header');
+      var controls = document.querySelector('.controls');
+      var scaleEl = document.querySelector('.simulator-scale');
+      var phone = document.querySelector('.phone-wrap');
+      if (!header || !controls || !scaleEl || !phone) return;
+      var used = header.offsetHeight + controls.offsetHeight + 48;
+      var available = h - used;
+      var scale = Math.min(1, (available / 692) * 0.98);
+      document.body.style.setProperty('--sim-scale', scale);
+    }
+    fitSimulator();
+    window.addEventListener('resize', fitSimulator);
+  </script>
+</body>
+</html>

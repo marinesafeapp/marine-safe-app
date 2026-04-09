@@ -54,7 +54,23 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.black,
-        title: const Text("Marine Safe"),
+        title: Text.rich(
+          TextSpan(
+            children: [
+              const TextSpan(
+                text: 'Marine ',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+              ),
+              TextSpan(
+                text: 'Safe',
+                style: TextStyle(
+                  color: const Color(0xFF2CB6FF),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
       drawer: Drawer(
         backgroundColor: const Color(0xFF11161C),
@@ -64,9 +80,23 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             DrawerHeader(
               decoration: const BoxDecoration(color: Colors.black),
               child: Center(
-                child: Text(
-                  "Marine Safe",
-                  style: TextStyle(color: Colors.white, fontSize: 24),
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(
+                        text: 'Marine ',
+                        style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
+                      ),
+                      TextSpan(
+                        text: 'Safe',
+                        style: TextStyle(
+                          color: const Color(0xFF2CB6FF),
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

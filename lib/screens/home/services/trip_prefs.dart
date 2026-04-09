@@ -10,6 +10,9 @@ class TripPrefs {
   static const _kPersonsOnBoard = 'trip.personsOnBoard';
   static const _kLastPersonsOnBoard = 'trip.lastPersonsOnBoard';
 
+  // ---- Trip fuel (litres added) ----
+  static const _kFuelAddedLitres = 'trip.fuelAddedLitres';
+
   static const _kOverdueAck = 'trip.overdueAck';
   static const _kOverdueNotifSent = 'trip.overdueNotifSent';
   static const _kOverdueRecorded = 'trip.overdueRecorded';
@@ -86,6 +89,18 @@ class TripPrefs {
 
   static Future<int> getLastPersonsOnBoard({int fallback = 2}) async =>
       (await _p()).getInt(_kLastPersonsOnBoard) ?? fallback;
+
+  static Future<void> setFuelAddedLitres(double? litres) async {
+    final p = await _p();
+    if (litres == null) {
+      await p.remove(_kFuelAddedLitres);
+    } else {
+      await p.setDouble(_kFuelAddedLitres, litres);
+    }
+  }
+
+  static Future<double?> getFuelAddedLitres() async =>
+      (await _p()).getDouble(_kFuelAddedLitres);
 
   // ---- Overdue ----
   static Future<void> setOverdueAck(bool v) async =>

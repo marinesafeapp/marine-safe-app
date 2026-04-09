@@ -52,6 +52,12 @@ class ModeratorUserDetailsScreen extends StatelessWidget {
 
           final rampName = (d['rampName'] ?? d['rampId'] ?? '—').toString();
           final personsOnBoard = (d['personsOnBoard'] ?? '—').toString();
+          final fuelAddedLitresRaw = d['fuelAddedLitres'];
+          final fuelAddedLitresText = fuelAddedLitresRaw is num
+              ? ((fuelAddedLitresRaw % 1 == 0)
+                  ? '${fuelAddedLitresRaw.round()} L'
+                  : '${fuelAddedLitresRaw.toStringAsFixed(1)} L')
+              : null;
 
           final departAt = _parseDate(d['departAtIso']);
           final eta = _parseDate(d['etaIso']);
@@ -101,6 +107,8 @@ class ModeratorUserDetailsScreen extends StatelessWidget {
                       lines: [
                         _infoRow(Icons.place_rounded, "Ramp", rampName),
                         _infoRow(Icons.groups_rounded, "People on board", personsOnBoard.toString()),
+                        if (fuelAddedLitresText != null)
+                          _infoRow(Icons.local_gas_station_rounded, "Fuel added", fuelAddedLitresText),
                         _infoRow(Icons.directions_boat_rounded, "Trip", tripActive ? "Active" : "Ended"),
                         if (totalOverdue != null)
                           _infoRow(Icons.schedule_rounded, "Total time overdue", totalOverdue),
@@ -537,11 +545,58 @@ class ModeratorUserDetailsScreen extends StatelessWidget {
   }
 
   // ---------- Last Location Section ----------
-  Widget _buildLastLocationSection(BuildContext context, Map<String, dynamic> tripData) {
+  /// Resolve last known location: lastLat/lastLng → lastLocation → launchRamp (same as SMS escalation).
+  static ({ double? lat, double? lng, DateTime? time, double? accuracy, double? speed, double? heading, bool isRampFallback, String? rampName }) _resolveLocation(Map<String, dynamic> tripData) {
+    final lastLat = (tripData['lastLat'] as num?)?.toDouble();
+    final lastLng = (tripData['lastLng'] as num?)?.toDouble();
     final lastLocation = tripData['lastLocation'] as Map<String, dynamic>?;
-    final hasLocation = lastLocation != null &&
-                       lastLocation['lat'] != null &&
-                       lastLocation['lng'] != null;
+    final launchRampLat = (tripData['launchRampLat'] as num?)?.toDouble();
+    final launchRampLng = (tripData['launchRampLng'] as num?)?.toDouble();
+    final launchRampName = tripData['launchRampName'] as String?;
+
+    if (lastLat != null && lastLng != null) {
+      final ts = tripData['lastLocationTimestamp'];
+      return (
+        lat: lastLat,
+        lng: lastLng,
+        time: _parseDate(ts),
+        accuracy: (tripData['lastLocationAccuracyM'] as num?)?.toDouble(),
+        speed: null,
+        heading: null,
+        isRampFallback: false,
+        rampName: null,
+      );
+    }
+    if (lastLocation != null && lastLocation['lat'] != null && lastLocation['lng'] != null) {
+      return (
+        lat: (lastLocation['lat'] as num).toDouble(),
+        lng: (lastLocation['lng'] as num).toDouble(),
+        time: _parseDate(lastLocation['timestamp'] ?? lastLocation['timestampUtc']),
+        accuracy: (lastLocation['accuracy'] ?? lastLocation['accuracyM']) as double?,
+        speed: lastLocation['speed'] as double?,
+        heading: lastLocation['heading'] as double?,
+        isRampFallback: false,
+        rampName: null,
+      );
+    }
+    if (launchRampLat != null && launchRampLng != null) {
+      return (
+        lat: launchRampLat,
+        lng: launchRampLng,
+        time: null,
+        accuracy: null,
+        speed: null,
+        heading: null,
+        isRampFallback: true,
+        rampName: launchRampName,
+      );
+    }
+    return (lat: null, lng: null, time: null, accuracy: null, speed: null, heading: null, isRampFallback: false, rampName: null);
+  }
+
+  Widget _buildLastLocationSection(BuildContext context, Map<String, dynamic> tripData) {
+    final resolved = _resolveLocation(tripData);
+    final hasLocation = resolved.lat != null && resolved.lng != null;
 
     if (!hasLocation) {
       return _sectionCard(
@@ -566,12 +621,12 @@ class ModeratorUserDetailsScreen extends StatelessWidget {
       );
     }
 
-    final lat = (lastLocation['lat'] as num).toDouble();
-    final lng = (lastLocation['lng'] as num).toDouble();
-    final locationTime = _parseDate(lastLocation['timestamp']);
-    final accuracy = lastLocation['accuracy'] as double?;
-    final speed = lastLocation['speed'] as double?;
-    final heading = lastLocation['heading'] as double?;
+    final lat = resolved.lat!;
+    final lng = resolved.lng!;
+    final locationTime = resolved.time;
+    final accuracy = resolved.accuracy;
+    final speed = resolved.speed;
+    final heading = resolved.heading;
 
     final locationAge = locationTime != null
         ? _formatLocationAge(DateTime.now().difference(locationTime))
@@ -582,6 +637,17 @@ class ModeratorUserDetailsScreen extends StatelessWidget {
         _sectionCard(
           title: "Last Known Location",
           children: [
+            if (resolved.isRampFallback && (resolved.rampName ?? '').isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.anchor_rounded, size: 16, color: Colors.orangeAccent),
+                    const SizedBox(width: 6),
+                    Text("Fallback: ${resolved.rampName}", style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.w700, fontSize: 12)),
+                  ],
+                ),
+              ),
             // Map view
             Container(
               height: 200,

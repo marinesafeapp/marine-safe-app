@@ -7,7 +7,11 @@ import 'package:timezone/timezone.dart' as tz;
 
 /// One-time init for OS-level local notifications.
 /// Call from main() early (e.g. after WidgetsFlutterBinding.ensureInitialized).
-/// Requests permissions (Android 13+ POST_NOTIFICATIONS, iOS), initializes timezone, creates channels.
+/// Initializes timezone and notification channels.
+///
+/// Note: we intentionally do NOT request OS notification permissions here,
+/// so first-time onboarding / registration stays clean. Permissions should be
+/// requested later from an in-app button (e.g. Reliability screen).
 Future<void> initNotifications() async {
   if (kIsWeb) return;
   if (!Platform.isAndroid && !Platform.isIOS) return;
@@ -25,18 +29,17 @@ Future<void> initNotifications() async {
   final plugin = FlutterLocalNotificationsPlugin();
   const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
   const iosInit = DarwinInitializationSettings(
-    requestAlertPermission: true,
-    requestSoundPermission: true,
-    requestBadgePermission: true,
+    requestAlertPermission: false,
+    requestSoundPermission: false,
+    requestBadgePermission: false,
   );
   const settings = InitializationSettings(android: androidInit, iOS: iosInit);
   await plugin.initialize(settings);
 
-  // Android 13+ POST_NOTIFICATIONS; iOS permission via DarwinInitializationSettings
+  // Android 13+: POST_NOTIFICATIONS permission is requested later (manual button).
   try {
     final android = plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
-    await android?.requestNotificationsPermission();
     try {
       await android?.requestExactAlarmsPermission();
     } catch (_) {}

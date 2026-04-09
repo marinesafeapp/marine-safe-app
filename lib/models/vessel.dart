@@ -8,6 +8,8 @@ class Vessel {
   final DateTime? boatRegoExpiry;
   final String trailerRego;
   final DateTime? trailerRegoExpiry;
+  /// Motor manufacturer/brand (e.g. Mercury, Yamaha). Stored per vessel.
+  final String motorBrand;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -19,6 +21,7 @@ class Vessel {
     this.boatRegoExpiry,
     this.trailerRego = '',
     this.trailerRegoExpiry,
+    this.motorBrand = '',
     this.createdAt,
     this.updatedAt,
   });
@@ -31,6 +34,7 @@ class Vessel {
         'boatRegoExpiry': boatRegoExpiry?.toIso8601String(),
         'trailerRego': trailerRego,
         'trailerRegoExpiry': trailerRegoExpiry?.toIso8601String(),
+    'motorBrand': motorBrand,
         'createdAt': createdAt?.toIso8601String(),
         'updatedAt': updatedAt?.toIso8601String(),
       };
@@ -44,6 +48,7 @@ class Vessel {
       boatRegoExpiry: _parseIso(json['boatRegoExpiry'] as String?),
       trailerRego: json['trailerRego'] as String? ?? '',
       trailerRegoExpiry: _parseIso(json['trailerRegoExpiry'] as String?),
+      motorBrand: json['motorBrand'] as String? ?? '',
       createdAt: _parseIso(json['createdAt'] as String?),
       updatedAt: _parseIso(json['updatedAt'] as String?),
     );
@@ -62,6 +67,7 @@ class Vessel {
     DateTime? boatRegoExpiry,
     String? trailerRego,
     DateTime? trailerRegoExpiry,
+    String? motorBrand,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -73,6 +79,7 @@ class Vessel {
       boatRegoExpiry: boatRegoExpiry ?? this.boatRegoExpiry,
       trailerRego: trailerRego ?? this.trailerRego,
       trailerRegoExpiry: trailerRegoExpiry ?? this.trailerRegoExpiry,
+      motorBrand: motorBrand ?? this.motorBrand,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

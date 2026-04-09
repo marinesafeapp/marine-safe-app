@@ -45,9 +45,26 @@ class _ProScreenState extends State<ProScreen> {
       appBar: AppBar(
         backgroundColor: _bg,
         elevation: 0,
-        title: const Text(
-          "Marine Safe Pro",
-          style: TextStyle(fontWeight: FontWeight.w900),
+        title: Text.rich(
+          TextSpan(
+            children: [
+              const TextSpan(
+                text: 'Marine ',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+              ),
+              TextSpan(
+                text: 'Safe',
+                style: TextStyle(
+                  color: const Color(0xFF2CB6FF),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const TextSpan(
+                text: ' Pro',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
         ),
       ),
       body: !_loaded

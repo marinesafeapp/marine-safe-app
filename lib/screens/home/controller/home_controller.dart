@@ -33,6 +33,7 @@ import '../../../services/trip_foreground_service.dart';
 import '../../../services/local_storage_service.dart';
 import '../../../services/user_profile_service.dart';
 import '../../../services/vessels_service.dart';
+import '../../../services/pro_pre_start_checklist_service.dart';
 
 class HomeController extends ChangeNotifier with WidgetsBindingObserver {
   /// Notifier for shell UI (e.g. hide bottom nav when trip is active). Listen from MainShell.
@@ -564,6 +565,76 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
     }
   }
 
+  Future<void> editFuelAdded(BuildContext context) async {
+    final current = state.fuelAddedLitres;
+    final initialText = current == null ? '' : current.toString();
+    final controller = TextEditingController(text: initialText);
+
+    final parsed = await showDialog<double?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF02050A),
+        title: const Text(
+          'Fuel added',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+        ),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Litres',
+            hintStyle: const TextStyle(color: Colors.white38),
+            filled: true,
+            fillColor: Colors.black.withValues(alpha: 0.25),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.white12),
+            ),
+            suffixText: 'L',
+            suffixStyle: const TextStyle(
+              color: Color(0xFF2CB6FF),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: const Text(
+              'Clear',
+              style: TextStyle(color: Colors.white70),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final raw = controller.text.trim();
+              final value = raw.isEmpty ? null : double.tryParse(raw);
+              Navigator.pop(ctx, value);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (parsed == null && controller.text.trim().isNotEmpty) {
+      // Non-numeric input: ignore.
+      return;
+    }
+
+    if (parsed == null) {
+      state.fuelAddedLitres = null;
+    } else {
+      if (parsed < 0) return;
+      state.fuelAddedLitres = parsed;
+    }
+
+    await TripPrefs.setFuelAddedLitres(state.fuelAddedLitres);
+    notifyListeners();
+    await _safeCloudUpsert();
+  }
+
   Future<void> startTrip(BuildContext context) async {
     if (state.selectedRamp == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -585,9 +656,13 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
     String? vesselId;
     String? boatRegoOverride;
     if (isPro) {
+      final vessels = await VesselsService.instance.getVessels();
       vesselId = await VesselsService.instance.getSelectedVesselId();
+      if (vesselId == null && vessels.isNotEmpty) {
+        vesselId = vessels.first.id;
+        await VesselsService.instance.setSelectedVesselId(vesselId);
+      }
       if (vesselId != null) {
-        final vessels = await VesselsService.instance.getVessels();
         Vessel? selectedVessel;
         for (final e in vessels) {
           if (e.id == vesselId) { selectedVessel = e; break; }
@@ -601,6 +676,14 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
       final proceed = await ComplianceDisclaimerDialog.show(context, issues: issues);
       if (!context.mounted) return;
       if (!proceed) return;
+    }
+
+    // Pro-ready pre-start checklist scaffold (no UI for now).
+    if (await UserProfileService.instance.getIsPro()) {
+      await ProPreStartChecklistService.instance.maybeRunChecklist(
+        context: context,
+        tripState: state,
+      );
     }
 
     // Alert reliability: show once (after registration or first trip), not every trip
@@ -631,12 +714,14 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
 
     state.overdueAcknowledged = false;
     state.overdueAlertFiredThisTrip = false;
+    state.fuelAddedLitres = null;
 
     // ✅ Persist trip truth FIRST
     await TripPrefs.setTripActive(true);
     await TripPrefs.setOverdueAck(false);
     await TripPrefs.setOverdueNotifSent(false);
     await TripPrefs.setOverdueRecorded(false);
+    await TripPrefs.setFuelAddedLitres(null);
     if (state.selectedRamp != null) {
       await TripPrefs.setRampId(state.selectedRamp!.id);
       await TripPrefs.setRampName(state.selectedRamp!.name);
@@ -664,6 +749,43 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
     } catch (e) {
       print('Cloud resetEscalationMarkers failed (offline?): $e');
     }
+    // Immediate location capture for overdue alerts: GPS or ramp fallback (do not block trip start)
+    _captureStartLocationAndUpdateTrip();
+  }
+
+  /// On trip start: get current position once; on success write last known location from GPS,
+  /// on failure write launch ramp as fallback so overdue SMS always has a usable location.
+  Future<void> _captureStartLocationAndUpdateTrip() async {
+    final ramp = state.selectedRamp;
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
+        timeLimit: const Duration(seconds: 8),
+      );
+      await _cloud.updateLastKnownLocation(
+        lat: position.latitude,
+        lng: position.longitude,
+        timestamp: position.timestamp ?? DateTime.now(),
+        source: 'gps_start',
+        accuracyM: position.accuracy,
+        lastLocationStatus: 'gps_start_ok',
+        locationPermissionState: (await Geolocator.checkPermission()).toString(),
+      );
+    } catch (e) {
+      if (ramp != null) {
+        try {
+          await _cloud.updateLastKnownLocation(
+            lat: ramp.lat,
+            lng: ramp.lon,
+            timestamp: DateTime.now(),
+            source: 'ramp_fallback',
+            lastLocationStatus: 'gps_start_failed_ramp_fallback',
+            lastLocationError: e.toString().length > 200 ? '${e.toString().substring(0, 200)}…' : e.toString(),
+            locationPermissionState: (await Geolocator.checkPermission()).toString(),
+          );
+        } catch (_) {}
+      }
+    }
   }
 
   Future<void> endTrip() async {
@@ -678,6 +800,7 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
         'startTime': startTime?.toIso8601String(),
         'stopTime': stopTime.toIso8601String(),
         if (eta != null) 'eta': eta.toIso8601String(),
+        if (state.fuelAddedLitres != null) 'fuelAddedLitres': state.fuelAddedLitres,
       };
       final history = await LocalStorageService.loadTripHistory();
       history.insert(0, entry);
@@ -786,9 +909,14 @@ If you are in immediate danger, call 000 or use VHF Channel 16 immediately.''',
         rampName: rampName,
         eta: eta,
         personsOnBoard: state.personsOnBoard,
+        fuelAddedLitres: state.fuelAddedLitres,
         onEditPeople: () async {
           Navigator.pop(context);
           await editPersonsOnBoard(context);
+        },
+        onEditFuel: () async {
+          Navigator.pop(context);
+          await editFuelAdded(context);
         },
         onExtend30m: () {
           Navigator.pop(context);

@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../screens/home/services/trip_prefs.dart';
+import 'trip_cloud_service.dart';
 
 /// GPS point model for local storage
 class GPSPoint {
@@ -219,37 +220,27 @@ class GPSTrackingService {
     }
   }
 
-  /// Update lastLocation field in trip document (trips/{tripId}.lastLocation)
+  /// Update last known location in trip document (single source of truth for overdue/escalation).
   Future<void> _updateLastLocation(GPSPoint point) async {
     try {
       final auth = FirebaseAuth.instance;
       if (auth.currentUser == null) return;
 
-      final tripId = auth.currentUser!.uid; // tripId = user's UID
-      if (tripId.isEmpty) return;
-
-      final db = FirebaseFirestore.instance;
-      // Store lastLocation as a field directly on the trip document: trips/{tripId}.lastLocation
-      final tripRef = db.collection('trips').doc(tripId);
-
-      final ts = Timestamp.fromDate(point.timestamp);
-      final lastLocation = <String, dynamic>{
-        'lat': point.latitude,
-        'lng': point.longitude,
-        'timestamp': ts,
-        'timestampUtc': ts,
-        'lastLocationUpdatedAt': ts,
-        if (point.speed != null) 'speed': point.speed,
-        if (point.heading != null) 'heading': point.heading,
-        if (point.accuracy != null) 'accuracy': point.accuracy,
-        if (point.accuracy != null) 'accuracyM': point.accuracy,
-      };
-
-      await tripRef.set({
-        'lastLocation': lastLocation,
-      }, SetOptions(merge: true));
+      await TripCloudService.instance.updateLastKnownLocation(
+        lat: point.latitude,
+        lng: point.longitude,
+        timestamp: point.timestamp,
+        source: 'gps_live',
+        accuracyM: point.accuracy,
+        lastLocationStatus: 'gps_live_ok',
+      );
     } catch (e) {
-      // Silently fail - offline or error, will retry later
+      try {
+        await TripCloudService.instance.setLastLocationError(
+          lastLocationStatus: 'gps_live_error',
+          lastLocationError: e.toString(),
+        );
+      } catch (_) {}
       print('Error updating lastLocation: $e');
     }
   }

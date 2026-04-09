@@ -20,8 +20,8 @@ class ExpiryNotificationService {
     final android = _plugin
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
 
-    // ✅ Android 13+ runtime permission prompt
-    await android?.requestNotificationsPermission();
+    // Android 13+: POST_NOTIFICATIONS runtime permission is requested later
+    // from an in-app button (Reliability screen). This keeps onboarding clean.
 
     // ✅ Create channel (Android 8+)
     const channel = AndroidNotificationChannel(

@@ -113,6 +113,14 @@ class TripCloudService {
       'rampId': s.selectedRamp?.id ?? '',
       'rampName': s.selectedRamp?.name ?? '',
       'personsOnBoard': s.personsOnBoard,
+      if (s.tripActive && s.fuelAddedLitres != null) 'fuelAddedLitres': s.fuelAddedLitres,
+
+      // Launch ramp coordinates (for overdue fallback when GPS unavailable)
+      if (s.tripActive && s.selectedRamp != null) ...{
+        'launchRampName': s.selectedRamp!.name,
+        'launchRampLat': s.selectedRamp!.lat,
+        'launchRampLng': s.selectedRamp!.lon,
+      },
 
       // Overdue (only set when trip active so we don't clear server/ended state)
       'overdueAcknowledged': s.overdueAcknowledged,
@@ -184,6 +192,45 @@ class TripCloudService {
       'updatedAt': FieldValue.serverTimestamp(),
       'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
     }, SetOptions(merge: true));
+  }
+
+  /// Single source of truth for overdue/escalation: last known location.
+  /// Call on trip start (GPS or ramp fallback) and from GPS tracking on each update.
+  Future<void> updateLastKnownLocation({
+    required double lat,
+    required double lng,
+    required DateTime timestamp,
+    required String source,
+    double? accuracyM,
+    String? lastLocationStatus,
+    String? lastLocationError,
+    String? locationPermissionState,
+  }) async {
+    final payload = <String, dynamic>{
+      'lastLat': lat,
+      'lastLng': lng,
+      'lastLocationTimestamp': Timestamp.fromDate(timestamp),
+      'lastLocationSource': source,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
+    };
+    if (accuracyM != null) payload['lastLocationAccuracyM'] = accuracyM;
+    if (lastLocationStatus != null) payload['lastLocationStatus'] = lastLocationStatus;
+    if (lastLocationError != null) payload['lastLocationError'] = lastLocationError;
+    if (locationPermissionState != null) payload['locationPermissionState'] = locationPermissionState;
+    payload['lastSuccessfulLocationAt'] = FieldValue.serverTimestamp();
+    await _doc().set(payload, SetOptions(merge: true));
+  }
+
+  /// Write only debug/error fields when tracking fails (keeps last known location intact).
+  Future<void> setLastLocationError({ String? lastLocationStatus, String? lastLocationError }) async {
+    final payload = <String, dynamic>{
+      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
+    };
+    if (lastLocationStatus != null) payload['lastLocationStatus'] = lastLocationStatus;
+    if (lastLocationError != null) payload['lastLocationError'] = lastLocationError.length > 200 ? '${lastLocationError.substring(0, 200)}…' : lastLocationError;
+    await _doc().set(payload, SetOptions(merge: true));
   }
 
   /// Call when user taps "I'm Safe" so server stops escalation immediately.

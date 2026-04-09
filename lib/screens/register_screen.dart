@@ -6,7 +6,6 @@ import '../main_shell.dart';
 import '../services/profile_cloud_service.dart';
 import '../services/user_profile_service.dart';
 import 'home/services/trip_prefs.dart';
-import 'reliability/reliability_check_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -125,19 +124,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (!mounted) return;
     setState(() => _saving = false);
-
-    // Show Alert Reliability once (then never again per trip)
-    final alreadyAcknowledged = await TripPrefs.getAlertReliabilityAcknowledged();
-    if (!alreadyAcknowledged) {
-      final continued = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const ReliabilityCheckScreen(showContinueButton: true),
-        ),
-      );
-      if (!mounted) return;
-      if (continued == true) await TripPrefs.setAlertReliabilityAcknowledged(true);
-    }
 
     if (!mounted) return;
     // Open directly to Profile (tab index 3) after first-time registration

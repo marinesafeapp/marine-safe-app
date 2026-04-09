@@ -61,6 +61,12 @@ android {
             }
             isMinifyEnabled = false
             isShrinkResources = false
+            // Workaround for Flutter/NDK issue:
+            // skip stripping debug symbols in the Gradle task so `flutter build appbundle`
+            // does not fail with "failed to strip debug symbols from native libraries".
+            ndk {
+                debugSymbolLevel = "none"
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

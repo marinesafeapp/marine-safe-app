@@ -34,7 +34,6 @@ class NotificationsService {
     try {
       final android = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
-      await android?.requestNotificationsPermission();
       try {
         await android?.requestExactAlarmsPermission();
       } catch (_) {}
