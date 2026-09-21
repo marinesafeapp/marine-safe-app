@@ -94,6 +94,10 @@ class TripCloudService {
   }
 
   Future<void> upsertFromState(HomeTripState s) async {
+    // Never create/update a trips doc unless the user has explicitly started a trip.
+    // Opening the app / selecting a ramp must not register a trip in Firestore.
+    if (!s.tripActive) return;
+
     final u = _auth.currentUser;
     final now = DateTime.now();
     final name = await _bestUserName();
@@ -105,39 +109,39 @@ class TripCloudService {
       'email': (u?.email ?? '').toString(),
 
       // Trip state
-      'tripActive': s.tripActive,
-      'active': s.tripActive,
+      'tripActive': true,
+      'active': true,
       'departAtIso': s.departAt?.toIso8601String() ?? '',
       'etaIso': s.eta?.toIso8601String() ?? '',
       'etaUtc': s.eta != null ? Timestamp.fromDate(s.eta!) : null,
       'rampId': s.selectedRamp?.id ?? '',
       'rampName': s.selectedRamp?.name ?? '',
       'personsOnBoard': s.personsOnBoard,
-      if (s.tripActive && s.fuelAddedLitres != null) 'fuelAddedLitres': s.fuelAddedLitres,
+      if (s.fuelAddedLitres != null) 'fuelAddedLitres': s.fuelAddedLitres,
 
       // Launch ramp coordinates (for overdue fallback when GPS unavailable)
-      if (s.tripActive && s.selectedRamp != null) ...{
+      if (s.selectedRamp != null) ...{
         'launchRampName': s.selectedRamp!.name,
         'launchRampLat': s.selectedRamp!.lat,
         'launchRampLng': s.selectedRamp!.lon,
       },
 
-      // Overdue (only set when trip active so we don't clear server/ended state)
+      // Overdue
       'overdueAcknowledged': s.overdueAcknowledged,
       'isOverdue': _calcIsOverdue(s),
-      if (s.tripActive) 'acknowledgedAtUtc': s.overdueAcknowledged ? FieldValue.serverTimestamp() : null,
-      if (s.tripActive) 'endedAtUtc': null,
+      'acknowledgedAtUtc': s.overdueAcknowledged ? FieldValue.serverTimestamp() : null,
+      'endedAtUtc': null,
 
       // Updated
       'updatedAt': FieldValue.serverTimestamp(),
       'updatedAtMs': now.millisecondsSinceEpoch,
     };
 
-    if (s.tripActive && s.eta != null) {
+    if (s.eta != null) {
       data['emergencyContacts'] = await _getEmergencyContactsSnapshot();
     }
 
-    if (s.tripActive && s.personsOnBoard > 1) {
+    if (s.personsOnBoard > 1) {
       final snap = await _doc().get();
       final existingCode = snap.data()?['joinCode'] as String?;
       final expiresAt = (snap.data()?['joinCodeExpiresAt'] as Timestamp?)?.toDate();
@@ -182,6 +186,18 @@ class TripCloudService {
     }
 
     await _doc().set(data, SetOptions(merge: true));
+  }
+
+  /// If local state says no trip but Firestore still has an active one (e.g. end
+  /// failed offline), clear the cloud trip. Does nothing when no trip doc exists,
+  /// so opening the app never creates a trip registration.
+  Future<void> clearStaleActiveTripIfNeeded() async {
+    final snap = await _doc().get();
+    if (!snap.exists) return;
+    final data = snap.data();
+    final active = data?['tripActive'] == true || data?['active'] == true;
+    if (!active) return;
+    await markEnded();
   }
 
   /// Call once when user starts a trip so server can send ETA+30/+40 SMS (resets markers).

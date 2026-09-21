@@ -129,7 +129,8 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
       await _maybeCloudHeartbeat();
     });
 
-    await _safeCloudUpsert();
+    // Only sync an active trip to the cloud. Opening the app must not register a trip.
+    await _syncCloudTripOnOpen();
     _reliabilityIssues = await FixIssueRouter.checkReliabilityIssues();
     notifyListeners();
   }
@@ -154,8 +155,10 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       // ✅ Rehydrate again (prevents any “active=false eta=null” wipeouts)
-      _rehydrateFromPrefs().then((_) => _syncSchedules());
-      _safeCloudUpsert();
+      _rehydrateFromPrefs().then((_) async {
+        await _syncSchedules();
+        await _syncCloudTripOnOpen();
+      });
       // Re-check reliability issues after returning from Settings
       FixIssueRouter.checkReliabilityIssues().then((issues) {
         _reliabilityIssues = issues;
@@ -192,11 +195,28 @@ class HomeController extends ChangeNotifier with WidgetsBindingObserver {
   // ---------------------------
 
   Future<void> _safeCloudUpsert() async {
+    // Guard: never write a trips doc unless a trip is actually active.
+    if (!state.tripActive) return;
     try {
       await _cloud.upsertFromState(state);
     } catch (e) {
       // ignore: avoid_print
       print('Cloud upsert failed (offline?): $e');
+    }
+  }
+
+  /// On open/resume: push active trip state, or clear a stale active cloud trip.
+  /// Must not create a trips document for users who never started a trip.
+  Future<void> _syncCloudTripOnOpen() async {
+    if (state.tripActive) {
+      await _safeCloudUpsert();
+      return;
+    }
+    try {
+      await _cloud.clearStaleActiveTripIfNeeded();
+    } catch (e) {
+      // ignore: avoid_print
+      print('Cloud clearStaleActiveTrip failed (offline?): $e');
     }
   }
 
