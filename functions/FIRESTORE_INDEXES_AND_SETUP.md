@@ -27,7 +27,9 @@ npx firebase functions:secrets:set TWILIO_AUTH_TOKEN
 # Paste your Twilio Auth Token when prompted
 
 npx firebase functions:secrets:set TWILIO_FROM_NUMBER
-# Paste your Twilio phone number in E.164 (e.g. +61412345678)
+# Paste the registered Alphanumeric Sender ID exactly: MarineSafe
+# (Twilio AU alpha sender IDs are case-sensitive. A long code in E.164 also works
+# where alpha is not required, e.g. +61412345678.)
 ```
 
 Or with the Firebase CLI:
@@ -35,8 +37,10 @@ Or with the Firebase CLI:
 ```bash
 firebase functions:secrets:set TWILIO_ACCOUNT_SID
 firebase functions:secrets:set TWILIO_AUTH_TOKEN
-firebase functions:secrets:set TWILIO_FROM_NUMBER
+printf '%s' 'MarineSafe' | firebase functions:secrets:set TWILIO_FROM_NUMBER --data-file=-
 ```
+
+**Australia alphanumeric Sender ID (approved):** `MarineSafe` (Twilio ticket 29433916; ACMA + Twilio registered Oct 2026). After changing the secret, redeploy functions so the new value is picked up (`firebase functions:secrets:set TWILIO_FROM_NUMBER --force`).
 
 ## Deploy
 

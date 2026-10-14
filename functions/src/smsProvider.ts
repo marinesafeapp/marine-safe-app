@@ -7,6 +7,8 @@ export type SmsSendResult =
 
 /**
  * Send SMS via Twilio. Uses Firebase Functions secrets.
+ * TWILIO_FROM_NUMBER may be an E.164 long code or a registered Alphanumeric
+ * Sender ID (for AU: MarineSafe — exact case required by Twilio).
  * @param toE164 - Recipient in E.164 (e.g. +614xxxxxxxx)
  * @param body - Message body
  * @returns ok:true with SID on success, ok:false with error on failure
